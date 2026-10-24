@@ -298,6 +298,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
     <label class="f">キャラの名前(タイトル用・短く)<span class="hint">ストアのタイトルや説明文に使います。例:ふさふさダックス</span><input type="text" id="charName" placeholder="ふさふさダックス"></label>
     <p class="small" id="themeHint" style="color:var(--warn);font-weight:700" hidden>テーマが短めです。「◯◯色の体」「おなかは白」など、色と形の特徴を書き足すと、狙ったキャラになりやすくなります。</p>
     <div style="display:grid;gap:8px"><span class="small" style="font-weight:700">絵柄(線の太さ・描き込み量・目の描き方まで、指示文に具体的に入ります)</span><div class="choice" id="tasteOpts"></div></div>
+    <div style="display:grid;gap:8px"><span class="small" style="font-weight:700">入れないもの(禁止の指定)</span><div class="checks" id="ngOpts"></div></div>
     <details><summary>絵柄の指定内容を見る</summary><pre class="prompt" id="tastePreview"></pre></details>
     <label class="f">絵柄の追加メモ(自由入力)<span class="hint">例:ほっぺは丸いピンク、しっぽは短め</span><input type="text" id="style" placeholder="ほっぺは丸いピンク、しっぽは短め"></label>
     <label class="f">自分のプロンプト(自由入力)<span class="hint">ここに書いた内容は、すべての指示文に追加されます</span><textarea id="userPrompt" placeholder="例:ほっぺはピンク。しっぽは短め。"></textarea></label>
@@ -814,7 +815,11 @@ function dupSets(){const tc={},pc={};S.phrases.slice(0,S.count).forEach(p=>{cons
 const AR={'4x2':'16:9','2x2':'1:1','1x1':'4:3'};const ARN={'16:9':'16:9(横長)','3:2':'3:2(やや横長)','4:3':'4:3(少し横長)','1:1':'1:1(正方形)'};
 function arText(){return ARN[S.aspect==='auto'?AR[S.layout]:S.aspect]}
 function charLine(){return `キャラ:${S.theme||'オリジナルのかわいいキャラクター'}`}
-function tasteBlock(){const t=TASTES[S.taste]||TASTES.yuru;return `【最優先】キャラの見た目(色・形・特徴)は【キャラ】の説明${S.ref?'と添付画像':''}を最優先する。絵柄の指定とぶつかる場合も、キャラらしさを守る。\n【絵柄】${t.d}${S.style?` 追加:${S.style}`:''}\n【禁止】${NG}`}
+function tasteBlock(){const t=TASTES[S.taste]||TASTES.yuru;return `【最優先】キャラの見た目(色・形・特徴)は【キャラ】の説明${S.ref?'と添付画像':''}を最優先する。絵柄の指定とぶつかる場合も、キャラらしさを守る。\n【絵柄】${t.d}${S.style?` 追加:${S.style}`:''}${ngText()?`\n【禁止】${ngText()}`:''}`}
+const NGI=[['real','リアルな描写',1],['shade','立体的な陰影',1],['grad','グラデーション',1],['bg','背景の描き込み',1],['eyes','目の中のハイライトやキラキラ',0],['fur','細かい毛並み',0],['props','頼んでいない小物(帽子・リボン・服など)',0]];
+function ngOn(k){return !(S.ng&&S.ng[k]===false)}
+function ngText(){const items=NGI.filter(([k])=>k!=='props'&&ngOn(k)).map(x=>x[1]);let t=items.length?items.join('、')+'は入れない。':'';
+  if(ngOn('props'))t+=/リボン|帽子|ネクタイ|マフラー|メガネ|眼鏡|服|スカーフ|首輪|マント|スーツ|鈴|バッグ/.test(S.theme||'')?'【キャラ】に書いてある小物以外の帽子・リボン・服などは付けない。':'指定していない帽子・リボン・蝶ネクタイ・服などの小物は付けない。';return t}
 function extra(){return S.userPrompt?`\n【追加の指定】${S.userPrompt}`:''}
 function who(){return S.ref?'添付した画像のキャラクターと同じキャラで、':'これまでと同じキャラクターで、'}
 function textRule(){
@@ -906,7 +911,8 @@ function renderSetup(){
   renderRef();updateAiLinks();
 }
 function themeHint(){const t=S.theme||'';$('#themeHint').hidden=!t||([...t].length>=14&&/色|白|黒|茶|赤|青|黄|緑|ピンク|オレンジ|グレー|紺|ベージュ/.test(t))}
-function renderTaste(){$('#tasteOpts').innerHTML=Object.entries(TASTES).map(([k,t])=>`<label class="opt"><input type="radio" name="taste" value="${k}" ${S.taste===k?'checked':''}><b>${t.n}</b><span>${t.s}</span></label>`).join('');
+function renderNg(){const box=$('#ngOpts');box.innerHTML='';NGI.forEach(([k,n,core])=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox"><span></span>`;l.querySelector('span').textContent=n+(core?'(切り抜きに必要・おすすめ)':'(好みで)');const c=l.querySelector('input');c.checked=ngOn(k);c.onchange=()=>{S.ng=S.ng||{};S.ng[k]=c.checked;save();$('#tastePreview').textContent=tasteBlock()};box.appendChild(l)})}
+function renderTaste(){renderNg();$('#tasteOpts').innerHTML=Object.entries(TASTES).map(([k,t])=>`<label class="opt"><input type="radio" name="taste" value="${k}" ${S.taste===k?'checked':''}><b>${t.n}</b><span>${t.s}</span></label>`).join('');
   $('#tastePreview').textContent=tasteBlock().replace(/\\n/g,'\n');
   $$('input[name=taste]').forEach(r=>r.addEventListener('change',()=>{S.taste=r.value;save();$('#tastePreview').textContent=tasteBlock()}))}
 $('#presets').addEventListener('click',e=>{const b=e.target.closest('[data-preset]');if(!b)return;const p=PRESETS[Number(b.dataset.preset)];
