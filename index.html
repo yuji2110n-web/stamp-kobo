@@ -483,7 +483,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
   </article>
   <article>
     <h3><span class="gnum">2</span>下書きと文字</h3>
-    <ul><li>セリフとポーズを決めます。テンプレート(日常・ユーモア3種・敬語・家族・カップル・季節)から選ぶか、「Claudeで作って入れる」でテーマに合わせた40個をその場で作れます(予備としてGeminiに頼む方法もあります)</li><li>ユーモア系は「前置き(小)+決めゼリフ(大)」の2段構成。文字のフチを「二重フチ(強調)」、色を赤にすると目立ちます</li><li>同じセリフやポーズがあると黄色で知らせます</li><li>文字は「このページで入れる」がおすすめ。フォント・位置(9か所)・横書き/縦書き・色・フチを選べます</li><li>文字の大きさは「1か所の最大文字数」で決まり、全部のスタンプでそろいます</li><li>「+ 2か所目の文字」で、もう1か所に文字を入れられます(大きさは同じ・7割・3割から選択)</li></ul>
+    <ul><li>セリフとポーズを決めます。テンプレート(日常・ユーモア3種・敬語・家族・カップル・季節)から選ぶか、「Claudeで作って入れる」でテーマに合わせた40個をその場で作れます(予備としてGeminiに頼む方法もあります)</li><li>ユーモア系は「前置き(小)+決めゼリフ(大)」の2段構成。文字のフチを「二重フチ(強調)」、色を赤にすると目立ちます</li><li>同じセリフやポーズがあると黄色で知らせます</li><li>文字は「このページで入れる」がおすすめ。フォント・位置(9か所)・横書き/縦書き・色・フチを選べます</li><li>文字の大きさは「1か所の最大文字数」で決まり、全部のスタンプでそろいます</li><li>文字の形(カーブ・ななめ・ゆらゆら)、部分の色変え、飾り(ハート・キラキラなど)、シール風の白フチ、文字をキャラの後ろに置く設定もできます</li><li>「+ 2か所目の文字」で、もう1か所に文字を入れられます(大きさは同じ・7割・3割から選択)</li></ul>
     <div class="ex"><span class="lab">参考例:文字の位置と書き方</span><div id="gx2" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"></div></div>
   </article>
   <article>
@@ -547,6 +547,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
       <div class="ed-box">
         <h4>文字</h4>
         <label class="f">セリフ<input type="text" id="edText"></label>
+        <div id="edAccent"></div>
         <div id="edSub"></div>
         <p class="small muted" id="edAiNote" hidden>文字はAIに描かせる設定です。<label class="checks"><span style="display:flex;gap:8px"><input type="checkbox" id="edForce">この1個だけ、このページで文字を入れる</span></label></p>
         <div id="edTcWrap">
@@ -649,7 +650,7 @@ const CHECKS=['スタンプのタイプは「スタンプ」を選んだ(あと�
 const META=[['titleJa','タイトル(日本語)',40,false],['descJa','説明文(日本語)',160,true],['titleEn','タイトル(英語)',40,false],['descEn','説明文(英語)',160,true],['creator','クリエイター名',50,false],['copyright','コピーライト(英数字のみ)',50,false]];
 const STEPS=['準備','下書きと文字','生成','手直し','確認','申請'];
 
-function defTxt(){return{font:'zenmaru',size:52,maxChars:8,color:'#1C2629',color2:'#1C2629',stroke:'white',pos:'bc',dir:'h',overlap:false}}
+function defTxt(){return{font:'zenmaru',size:52,maxChars:8,color:'#1C2629',color2:'#1C2629',stroke:'white',pos:'bc',dir:'h',overlap:false,shape:'flat',big:false,accMode:'none',accent:'#E8507A',deco:'none',border:'none',behind:false}}
 function defaults(){return{v:2,id:newId(),name:'スタンプ1',step:1,visited:{},provider:'gemini',customName:'',customUrl:'',bg:'green',count:40,layout:'4x2',aspect:'auto',theme:'',style:'',userPrompt:'',ref:null,
   textMode:'system',txt:defTxt(),tpl:'daily',taste:'yuru',phrases:tplPhrases('daily'),stickers:[],mainIdx:0,tabIdx:0,
   meta:{titleJa:'',descJa:'',titleEn:'',descEn:'',creator:'',copyright:''},checks:[]}}
@@ -777,7 +778,7 @@ function newSticker(i,rawC,procC){const old=S.stickers[i];S.stickers[i]={src:pro
 
 /* ---------- text + render ---------- */
 const ROT=new Set([...'ー〜～…‥—―-−~()()<>=']);const SMALL=new Set([...'ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ']);const PUNCT=new Set([...'、。,.']);const VMAP={'「':'﹁','」':'﹂','『':'﹃','』':'﹄'};
-function txtStyle(i){const st=S.stickers[i];return(st&&st.ts)?st.ts:S.txt}
+function txtStyle(i){const st=S.stickers[i];return Object.assign(defTxt(),(st&&st.ts)?st.ts:S.txt)}
 function textOn(i){const st=S.stickers[i];return S.textMode==='system'||!!(st&&st.ts&&st.ts.force)}
 const SWK=0.14;
 const swkOf=ts=>ts.stroke==='none'?0:ts.stroke==='double'?SWK*2.2:SWK;
@@ -785,42 +786,86 @@ function maxN(){return S.txt.maxChars||8}
 function baseFs(ts,w,h,m){const k=h/320;const swk=swkOf(ts);const N=ts.maxChars||maxN();
   if(ts.dir==='v')return Math.min(90*k,(h-2*m)/(N*1.04+swk));
   const x=ctx(mk(4,4));x.font=fontStr(ts,100);const per=x.measureText('あ'.repeat(N)).width/100;return Math.min(90*k,(w-2*m)/(per+swk))}
-function layoutText(x,text,ts,w,h,m,scale=1){
-  let fs=baseFs(ts,w,h,m)*scale;const swk=swkOf(ts);const chars=[...text];
-  if(ts.dir==='v'){const maxH=h-2*m;const th=chars.length*fs*1.04+fs*swk;if(th>maxH)fs*=maxH/th;return{fs,tw:fs*(1.1+swk),th:chars.length*fs*1.04+fs*swk}}
-  x.font=fontStr(ts,fs);let tw=x.measureText(text).width+fs*swk;const maxW=w-2*m;if(tw>maxW){fs*=maxW/tw;x.font=fontStr(ts,fs);tw=x.measureText(text).width+fs*swk}
-  return{fs,tw,th:fs*(1.2+swk)};
-}
+function measureT(x,text,ts,fs,sub){const swk=swkOf(ts);const chars=[...text];const big=!sub&&ts.big;const sh=ts.shape||'flat';
+  if(ts.dir==='v'){let th=chars.length*fs*1.04+fs*swk+(big?fs*0.3:0);let tw=fs*(1.1+swk)+(big?fs*0.3:0)+(sh==='wave'?fs*0.25:0);return{tw,th}}
+  x.font=fontStr(ts,fs);let tw=x.measureText(text).width+fs*swk;if(big&&chars[0]){tw+=x.measureText(chars[0]).width*0.3}
+  let th=fs*(1.2+swk)+(big?fs*0.3:0)+((sh==='arc'||sh==='wave')?fs*0.4:0);if(sh==='tilt'){th+=tw*0.13;tw+=fs*0.15}
+  return{tw,th}}
+function layoutText(x,text,ts,w,h,m,scale=1,sub=false){
+  let fs=baseFs(ts,w,h,m)*scale;let r=measureT(x,text,ts,fs,sub);
+  const maxW=w-2*m,maxH=h-2*m;const k=Math.min(1,maxW/r.tw,maxH/r.th);if(k<1){fs*=k;r=measureT(x,text,ts,fs,sub)}
+  return{fs,tw:r.tw,th:r.th}}
+function borderW(ts,h){return({thin:4,thick:7}[ts.border]||0)*h/320}
 function layoutFor(i,w,h,m,withText){
-  const ph=S.phrases[i]||{};const text=ph.t||'';const ts=txtStyle(i);const on=withText&&textOn(i);
+  const ph=S.phrases[i]||{};const text=ph.t||'';const ts=txtStyle(i);const on=withText&&textOn(i);m=m+borderW(ts,h);
   const show=on&&!!text;const sub=ph.s2&&ph.s2.t?ph.s2:null;const show2=on&&!!sub;
   let x0=m,y0=m,x1=w-m,y1=h-m,L=null,L2=null;const x=ctx(mk(4,4));
-  const res=(L,pos)=>{if(ts.overlap)return;const [c,r]=POS[pos]||POS.bc;
+  const res=(L,pos)=>{if(ts.overlap||ts.behind)return;const [c,r]=POS[pos]||POS.bc;
     if(ts.dir==='h'){if(r===0)y0=Math.max(y0,m+L.th);else if(r===2)y1=Math.min(y1,h-m-L.th);else if(c===0)x0=Math.max(x0,m+L.tw);else if(c===2)x1=Math.min(x1,w-m-L.tw)}
     else{if(c===0)x0=Math.max(x0,m+L.tw);else if(c===2)x1=Math.min(x1,w-m-L.tw);else if(r===0)y0=Math.max(y0,m+L.th*0.5);else if(r===2)y1=Math.min(y1,h-m-L.th*0.5)}};
   if(show){L=layoutText(x,text,ts,w,h,m);res(L,ts.pos)}
-  if(show2){L2=layoutText(x,sub.t,ts,w,h,m,sub.k||0.7);res(L2,sub.pos||'tr')}
-  return{text,show,ts,L,sub,show2,L2,rect:{x:x0,y:y0,w:Math.max(20,x1-x0),h:Math.max(20,y1-y0)}};
+  if(show2){L2=layoutText(x,sub.t,ts,w,h,m,sub.k||0.7,true);res(L2,sub.pos||'tr')}
+  return{text,show,ts,L,sub,show2,L2,m,ph,rect:{x:x0,y:y0,w:Math.max(20,x1-x0),h:Math.max(20,y1-y0)}};
 }
 function imgGeom(src,st,rect,w,h){const sw=src.naturalWidth||src.width,sh=src.naturalHeight||src.height;const s=Math.min(rect.w/sw,rect.h/sh)*(st?st.scale:0.85);const dw=sw*s,dh=sh*s;return{s,dw,dh,px:rect.x+(rect.w-dw)/2+(st?st.dx:0)*w,py:rect.y+(rect.h-dh)/2+(st?st.dy:0)*h}}
-function drawText(x,text,ts,L,pos,w,h,m,color){
+function accMask(text,ts,ph){const n=[...text].length;const md=ts.accMode||'none';if(md==='none')return null;
+  if(md==='tail'){const h=Math.ceil(n/2);return Array.from({length:n},(_,i)=>i>=h)}
+  if(md==='first')return Array.from({length:n},(_,i)=>i===0);
+  const am=(ph&&ph.am)||'';return Array.from({length:n},(_,i)=>am[i]==='1')}
+function drawText(x,text,ts,L,pos,w,h,m,color,sub,mask){
   const [c,r]=POS[pos]||POS.bc;const cx=c===0?m+L.tw/2:c===2?w-m-L.tw/2:w/2;const cy=r===0?m+L.th/2:r===2?h-m-L.th/2:h/2;
-  x.font=fontStr(ts,L.fs);x.lineJoin='round';x.textAlign='center';x.textBaseline='middle';
-  const sw=ts.stroke==='none'?0:L.fs*SWK;const sc=ts.stroke==='black'?'#1C2629':'#FFFFFF';const dbl=ts.stroke==='double';const fc=color||ts.color;
+  const fs=L.fs;x.lineJoin='round';x.textAlign='center';x.textBaseline='middle';
+  const sw=ts.stroke==='none'?0:fs*SWK;const sc=ts.stroke==='black'?'#1C2629':'#FFFFFF';const dbl=ts.stroke==='double';const base=color||ts.color;const acc=ts.accent||'#E8507A';
+  const chars=[...text];const big=!sub&&ts.big;const sh=ts.shape||'flat';const sizes=chars.map((_,i)=>fs*(big&&i===0?1.3:1));
   const items=[];
-  if(ts.dir==='h')items.push([text,cx,cy,false]);
-  else{const chars=[...text];const step=L.fs*1.04;let y=cy-(chars.length*step)/2+step/2;
-    for(const ch0 of chars){let ch=VMAP[ch0]||ch0,dx=0,dy=0,rot=false;if(ROT.has(ch0))rot=true;else if(SMALL.has(ch0)){dx=L.fs*0.12;dy=-L.fs*0.12}else if(PUNCT.has(ch0)){dx=L.fs*0.55;dy=-L.fs*0.5}items.push([ch,cx+dx,y+dy,rot]);y+=step}}
-  const put=(it,mode)=>{x.save();x.translate(it[1],it[2]);if(it[3])x.rotate(Math.PI/2);if(mode==='o'){x.lineWidth=sw*2.2;x.strokeStyle='#1C2629';x.strokeText(it[0],0,0)}else if(mode==='s'){x.lineWidth=dbl?sw*1.6:sw;x.strokeStyle=sc;x.strokeText(it[0],0,0)}else{x.fillStyle=fc;x.fillText(it[0],0,0)}x.restore()};
+  if(ts.dir!=='v'){
+    const ws=chars.map((ch,i)=>{x.font=fontStr(ts,sizes[i]);return x.measureText(ch).width});const tot=ws.reduce((a,b)=>a+b,0);const half=Math.max(1,tot/2);let px=cx-tot/2;
+    chars.forEach((ch,i)=>{const mx=px+ws[i]/2;px+=ws[i];let y=cy,rot=0;const dx=mx-cx;
+      if(sh==='arc'){const k=fs*0.38/(half*half);const d=r===2?-1:1;y=cy+d*(k*dx*dx-fs*0.19);rot=d*Math.atan(2*k*dx)}
+      if(sh==='wave')y=cy+(i%2?1:-1)*fs*0.12;
+      if(big&&i===0)y-=fs*0.05;
+      items.push({ch,x:mx,y,rot,size:sizes[i],col:mask&&mask[i]?acc:base})});
+  }else{
+    const step=fs*1.04;const tot=sizes.reduce((a,b)=>a+b*1.04,0);let y=cy-tot/2;
+    chars.forEach((ch0,i)=>{const st=sizes[i]*1.04;const my=y+st/2;y+=st;let ch=VMAP[ch0]||ch0,dx=0,dy=0,rot=0;if(ROT.has(ch0))rot=Math.PI/2;else if(SMALL.has(ch0)){dx=fs*0.12;dy=-fs*0.12}else if(PUNCT.has(ch0)){dx=fs*0.55;dy=-fs*0.5}
+      if(sh==='wave')dx+=(i%2?1:-1)*fs*0.1;items.push({ch,x:cx+dx,y:my+dy,rot,size:sizes[i],col:mask&&mask[i]?acc:base})});
+  }
+  if(sh==='tilt'){const a=-0.13,ca=Math.cos(a),sa=Math.sin(a);items.forEach(it=>{const dx=it.x-cx,dy=it.y-cy;it.x=cx+dx*ca-dy*sa;it.y=cy+dx*sa+dy*ca;it.rot+=a})}
+  const put=(it,mode)=>{x.save();x.translate(it.x,it.y);if(it.rot)x.rotate(it.rot);x.font=fontStr(ts,it.size);const lw=it.size*SWK;
+    if(mode==='o'){x.lineWidth=lw*2.2;x.strokeStyle='#1C2629';x.strokeText(it.ch,0,0)}else if(mode==='s'){x.lineWidth=dbl?lw*1.6:lw;x.strokeStyle=sc;x.strokeText(it.ch,0,0)}else{x.fillStyle=it.col;x.fillText(it.ch,0,0)}x.restore()};
   if(dbl)items.forEach(it=>put(it,'o'));if(sw)items.forEach(it=>put(it,'s'));items.forEach(it=>put(it,'f'));
+  return{x0:cx-L.tw/2,y0:cy-L.th/2,x1:cx+L.tw/2,y1:cy+L.th/2};
 }
+const DECOS=[['none','なし'],['auto','おまかせ'],['heart','ハート'],['sparkle','キラキラ'],['sweat','汗'],['zzz','Zzz'],['note','音符']];
+function decoAuto(t){t=t||'';if(/ねむ|眠|おやすみ|寝|zz/i.test(t))return'zzz';if(/好き|すき|ありが|感謝|愛|ちゅ|ぎゅ|ラブ|♡/.test(t))return'heart';if(/ごめん|汗|やば|ヤバ|えっ|えー|焦|あせ|すみません|申し訳/.test(t))return'sweat';if(/楽し|♪|うれし|嬉し|ルン|わくわく/.test(t))return'note';return'sparkle'}
+function drawDeco(x,kind,b,fs,w,h,m){if(!kind||kind==='none')return;const s=Math.max(8,fs*0.36);const cl=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+  const P=(px,py)=>[cl(px,m+s,w-m-s),cl(py,m+s,h-m-s)];
+  const ol=(fn)=>{x.save();x.lineJoin='round';x.lineWidth=s*0.28;x.strokeStyle='#FFFFFF';fn(true);x.restore();x.save();fn(false);x.restore()};
+  const heart=(px,py,sz)=>ol(st=>{x.beginPath();x.moveTo(px,py+sz*0.35);x.bezierCurveTo(px-sz*1.1,py-sz*0.4,px-sz*0.45,py-sz*1.1,px,py-sz*0.45);x.bezierCurveTo(px+sz*0.45,py-sz*1.1,px+sz*1.1,py-sz*0.4,px,py+sz*0.35);x.closePath();if(st)x.stroke();else{x.fillStyle='#F0567A';x.fill()}});
+  const star=(px,py,sz)=>ol(st=>{x.beginPath();for(let k=0;k<8;k++){const a=k*Math.PI/4-Math.PI/2,rr=k%2?sz*0.32:sz;x.lineTo(px+Math.cos(a)*rr,py+Math.sin(a)*rr)}x.closePath();if(st)x.stroke();else{x.fillStyle='#FFC531';x.fill()}});
+  const drop=(px,py,sz)=>ol(st=>{x.beginPath();x.moveTo(px,py-sz);x.bezierCurveTo(px+sz*0.9,py,px+sz*0.6,py+sz*0.8,px,py+sz*0.8);x.bezierCurveTo(px-sz*0.6,py+sz*0.8,px-sz*0.9,py,px,py-sz);x.closePath();if(st)x.stroke();else{x.fillStyle='#5AAEF0';x.fill()}});
+  const zee=(px,py,sz)=>ol(st=>{x.font=`900 ${sz*1.6}px sans-serif`;x.textAlign='center';x.textBaseline='middle';if(st){x.lineWidth=sz*0.35;x.strokeText('Z',px,py)}else{x.fillStyle='#5B6BD6';x.fillText('Z',px,py)}});
+  const note=(px,py,sz)=>ol(st=>{x.beginPath();x.ellipse(px-sz*0.25,py+sz*0.45,sz*0.42,sz*0.32,-0.4,0,Math.PI*2);x.rect(px+sz*0.08,py-sz*0.9,sz*0.16,sz*1.35);x.moveTo(px+sz*0.24,py-sz*0.9);x.lineTo(px+sz*0.8,py-sz*0.55);x.lineTo(px+sz*0.8,py-sz*0.3);x.lineTo(px+sz*0.24,py-sz*0.6);if(st)x.stroke();else{x.fillStyle='#F29A00';x.fill()}});
+  const R1=P(b.x1+s*0.5,b.y0+s*0.2),L1=P(b.x0-s*0.5,b.y0+s*0.4),R2=P(b.x1+s*0.3,b.y1-s*0.3);
+  if(kind==='heart'){heart(...R1,s);heart(...L1,s*0.7)}
+  else if(kind==='sparkle'){star(...R1,s);star(...L1,s*0.75);star(...R2,s*0.55)}
+  else if(kind==='sweat'){drop(...L1,s*0.8);drop(L1[0]+s*0.9,L1[1]-s*0.5,s*0.55)}
+  else if(kind==='zzz'){zee(...R1,s*0.85);zee(R1[0]+s*0.9>w-m-s?R1[0]-s*0.9:R1[0]+s*0.9,cl(R1[1]-s*1.2,m+s,h-m-s),s*0.65);}
+  else if(kind==='note'){note(...R1,s);note(...L1,s*0.7)}}
+function addBorder(c,bw){const w=c.width,h=c.height;const t=mk(w,h),tx=ctx(t);const n=24;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;tx.drawImage(c,Math.cos(a)*bw,Math.sin(a)*bw)}
+  tx.globalCompositeOperation='source-in';tx.fillStyle='#FFFFFF';tx.fillRect(0,0,w,h);tx.globalCompositeOperation='source-over';tx.drawImage(c,0,0);return t}
 function renderSt(i,w=W,h=H,m=M,withText=true,ghost=false){
-  const c=mk(w,h),x=ctx(c);const st=S.stickers[i];const ok=has(i);const lay=layoutFor(i,w,h,m,withText);
+  let c=mk(w,h),x=ctx(c);const st=S.stickers[i];const ok=has(i);const lay=layoutFor(i,w,h,m,withText);const mm=lay.m;const ts=lay.ts;
   const src=ok?RT[i].cv:(ghost&&refImg?refImg:null);
-  if(src){const g=imgGeom(src,ok?st:null,lay.rect,w,h);x.globalAlpha=ok?1:0.3;x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(src,g.px,g.py,g.dw,g.dh);x.globalAlpha=1}
-  else if(ghost){const r=lay.rect;x.save();x.setLineDash([10,8]);x.strokeStyle='rgba(120,130,135,.55)';x.lineWidth=3;x.strokeRect(r.x+12,r.y+12,r.w-24,r.h-24);x.fillStyle='rgba(120,130,135,.6)';x.font='700 22px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(S.phrases[i]?.p||'絵',r.x+r.w/2,r.y+r.h/2,r.w-40);x.restore()}
-  if(lay.show)drawText(x,lay.text,lay.ts,lay.L,lay.ts.pos,w,h,m);
-  if(lay.show2)drawText(x,lay.sub.t,lay.ts,lay.L2,lay.sub.pos||'tr',w,h,m,lay.ts.color2||lay.ts.color);
+  const drawImg=()=>{if(src){const g=imgGeom(src,ok?st:null,lay.rect,w,h);x.globalAlpha=ok?1:0.3;x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(src,g.px,g.py,g.dw,g.dh);x.globalAlpha=1}
+    else if(ghost){const r=lay.rect;x.save();x.setLineDash([10,8]);x.strokeStyle='rgba(120,130,135,.55)';x.lineWidth=3;x.strokeRect(r.x+12,r.y+12,r.w-24,r.h-24);x.fillStyle='rgba(120,130,135,.6)';x.font='700 22px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(S.phrases[i]?.p||'絵',r.x+r.w/2,r.y+r.h/2,r.w-40);x.restore()}};
+  let box=null;const drawTxt=()=>{if(lay.show)box=drawText(x,lay.text,ts,lay.L,ts.pos,w,h,mm,null,false,accMask(lay.text,ts,lay.ph));
+    if(lay.show2)drawText(x,lay.sub.t,ts,lay.L2,lay.sub.pos||'tr',w,h,mm,ts.color2||ts.color,true,null)};
+  if(ts.behind&&lay.show){drawTxt();drawImg()}else{drawImg();drawTxt()}
+  if(withText&&textOn(i)&&ts.deco&&ts.deco!=='none'){const kind=ts.deco==='auto'?decoAuto((lay.ph.t||'')+' '+(lay.ph.p||'')):ts.deco;
+    const b=box||(src?(()=>{const g=imgGeom(src,ok?st:null,lay.rect,w,h);return{x0:g.px,y0:g.py,x1:g.px+g.dw,y1:g.py+g.dh}})():null);
+    if(b)drawDeco(x,kind,b,lay.L?lay.L.fs:h*0.15,w,h,mm)}
+  const bw=borderW(ts,h);if(bw&&ok)c=addBorder(c,bw);
   return c;
 }
 function marginBad(c,m=M){const w=c.width,h=c.height,d=ctx(c).getImageData(0,0,w,h).data;for(let y=0;y<h;y++){const ey=y<m||y>=h-m;for(let x=0;x<w;x++){if(!ey&&x>=m&&x<w-m){x=w-m-1;continue}if(d[(y*w+x)*4+3]>16)return true}}return false}
@@ -865,6 +910,12 @@ function fixPrompt(i){
   return `${who()}LINEスタンプ用のイラスト${has(i)?'を1体だけ作り直して':'を1体だけ描いて'}ください。\n【画像の縦横比】4:3(少し横長)\n【中身】${itemLine(i,1).replace(/^1\. /,'')}\n${note?`【直してほしい所】${note}\n`:''}【${charLine()}】\n${tasteBlock()}\n${textRule()}\n【配置】1枚の画像の中央に1体だけ。周りに余白を残す。\n【背景】${BGTXT[S.bg]}${others.length?`\n【かぶらないように】ほかのスタンプのポーズ(${others.join('、')})とは違う構図にする。`:''}${extra()}${finalRules(false)}`;
 }
 
+function mountAccent(){const box=$('#edAccent');if(!box)return;const ph=S.phrases[EI]||{t:''};const chars=[...(ph.t||'')];const ts=txtStyle(EI);box.innerHTML='';if(!chars.length)return;
+  const lab=document.createElement('span');lab.className='small';lab.style.fontWeight='700';lab.textContent='色を変える文字(タップで切り替え)';box.appendChild(lab);
+  const row=document.createElement('div');row.className='chips';row.style.marginTop='6px';const am=(ph.am||'').padEnd(chars.length,'0').split('');
+  chars.forEach((ch,k)=>{const b=document.createElement('button');b.type='button';b.textContent=ch;const on=am[k]==='1';b.style.background=on?(ts.accent||'#E8507A'):'';b.style.color=on?'#fff':'';b.onclick=()=>{am[k]=am[k]==='1'?'0':'1';ph.am=am.join('');if(txtStyle(EI).accMode!=='manual'){if(S.stickers[EI]&&S.stickers[EI].ts)S.stickers[EI].ts.accMode='manual';else S.txt.accMode='manual'}save();mountAccent();drawEd()};row.appendChild(b)});
+  box.appendChild(row);const n=document.createElement('p');n.className='small muted';n.textContent=ts.accMode==='manual'?'選んだ文字が「色変えの色」になります':'タップすると「部分の色変え」が「手動」に切り替わります';box.appendChild(n)}
+
 /* ---------- editable prompts ---------- */
 function pEd(){return S.pEdits||(S.pEdits={})}
 function promptText(key,auto){const e=pEd()[key];return e?e.text:auto}
@@ -892,6 +943,14 @@ function buildTc(root,getTs,onChange,sample,opts={}){
   if(!opts.editor){const zd=sec('1か所の最大文字数(この文字数がちょうど収まる大きさに、全部の文字をそろえます)');const sel=document.createElement('select');sel.setAttribute('aria-label','最大文字数');sel.style.maxWidth='220px';sel.innerHTML=[5,6,7,8,9,10].map(n=>`<option value="${n}">${n}文字</option>`).join('');sel.value=String(ts.maxChars||8);sel.onchange=()=>onChange({maxChars:Number(sel.value)},true);zd.appendChild(sel)}
   const cd=sec('文字の色');const sw=document.createElement('div');sw.className='swatches';COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.setAttribute('aria-label','色 '+c);b.setAttribute('aria-pressed',String(ts.color===c));b.onclick=()=>onChange({color:c},true);sw.appendChild(b)});cd.appendChild(sw);
   const cd2=sec('2か所目(前置き)の文字の色');const sw2=document.createElement('div');sw2.className='swatches';COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.setAttribute('aria-label','2か所目の色 '+c);b.setAttribute('aria-pressed',String((ts.color2||ts.color)===c));b.onclick=()=>onChange({color2:c},true);sw2.appendChild(b)});cd2.appendChild(sw2);
+  const segRow=(label,key,opts)=>{const d=sec(label);const g=document.createElement('div');g.className='seg';opts.forEach(([k,n])=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.setAttribute('aria-pressed',String((ts[key]||opts[0][0])===k));b.onclick=()=>onChange({[key]:k},true);g.appendChild(b)});d.appendChild(g);return d};
+  segRow('文字の形','shape',[['flat','まっすぐ'],['arc','カーブ'],['tilt','ななめ'],['wave','ゆらゆら']]);
+  const ad=segRow('部分の色変え','accMode',[['none','なし'],['tail','後半'],['first','1文字目'],['manual','手動']]);
+  const sw3=document.createElement('div');sw3.className='swatches';COLORS.concat(['#E8507A']).forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.setAttribute('aria-label','色変えの色 '+c);b.setAttribute('aria-pressed',String((ts.accent||'#E8507A')===c));b.onclick=()=>onChange({accent:c},true);sw3.appendChild(b)});ad.appendChild(sw3);
+  const an=document.createElement('span');an.className='small muted';an.textContent='「手動」は、STEP 4の手直し画面で色を変えたい文字をタップして選びます';ad.appendChild(an);
+  segRow('飾り(文字のまわり)','deco',DECOS);
+  segRow('スタンプ全体の白フチ(シール風)','border',[['none','なし'],['thin','細め'],['thick','太め']]);
+  const bd=document.createElement('div');bd.className='checks';bd.innerHTML='<label><input type="checkbox">1文字目を大きくする</label><label><input type="checkbox">文字をキャラの後ろに置く(絵と重ねて一体化)</label>';const [bg1,bh1]=bd.querySelectorAll('input');bg1.checked=!!ts.big;bh1.checked=!!ts.behind;bg1.onchange=()=>onChange({big:bg1.checked},true);bh1.onchange=()=>onChange({behind:bh1.checked},true);root.appendChild(bd);
   const od=sec('文字のフチ');const og=document.createElement('div');og.className='seg';[['white','白フチ'],['black','黒フチ'],['double','二重フチ(強調)'],['none','フチなし']].forEach(([k,n])=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.setAttribute('aria-pressed',String(ts.stroke===k));b.onclick=()=>onChange({stroke:k},true);og.appendChild(b)});od.appendChild(og);
   const ld=document.createElement('div');ld.className='checks';ld.innerHTML='<label><input type="checkbox">絵と文字を重ねる(オフだと文字の分だけ絵を小さくします)</label>';const cb=ld.querySelector('input');cb.checked=!!ts.overlap;cb.onchange=()=>onChange({overlap:cb.checked},true);root.appendChild(ld);
 }
@@ -1125,6 +1184,7 @@ function syncTc(){
     buildTc($('#edTc'),()=>txtStyle(EI),onStTs,S.phrases[EI]?.t||'おはよう',{editor:true});$('#edTsReset').hidden=!(st.ts&&!st.ts.force)}
 }
 function syncEd(){
+  mountAccent();
   mountPrompt($('#edPromptBox'),'fix:'+EI,()=>fixPrompt(EI));
   UNDO=[];updUndo();
   const st=S.stickers[EI],h=has(EI);$('#edTitle').textContent=`${pad(EI+1)}番 ${S.phrases[EI]?.t?`「${S.phrases[EI].t}」`:''}`;
@@ -1142,7 +1202,7 @@ function drawEd(skip){
 }
 const bindR=(id,fn)=>$(id).addEventListener('input',e=>{const st=S.stickers[EI];if(!st)return;fn(st,e.target.value);save();drawEd()});
 bindR('#edScale',(s,v)=>s.scale=v/100);bindR('#edDx',(s,v)=>s.dx=v/100);bindR('#edDy',(s,v)=>s.dy=v/100);
-$('#edText').addEventListener('input',async e=>{const ph=S.phrases[EI]||(S.phrases[EI]={t:'',p:''});ph.t=e.target.value;save();await ensureFonts();drawEd()});
+$('#edText').addEventListener('input',async e=>{const ph=S.phrases[EI]||(S.phrases[EI]={t:'',p:''});ph.t=e.target.value;mountAccent();save();await ensureFonts();drawEd()});
 $('#edForce').addEventListener('change',e=>{const st=S.stickers[EI];if(!st)return;st.ts=e.target.checked?Object.assign({},S.txt,{force:true}):null;save();syncTc();drawEd()});
 $('#edTsReset').addEventListener('click',()=>{const st=S.stickers[EI];if(!st)return;st.ts=null;save();syncTc();drawEd();toast('全体の設定に戻しました')});
 $('#edTsAll').addEventListener('click',()=>{const ts=txtStyle(EI);S.txt=Object.assign(defTxt(),ts);delete S.txt.force;S.stickers.forEach(s=>{if(s&&s.ts&&!s.ts.force)s.ts=null});save();syncTc();drawEd();toast('この文字設定を全部に使いました')});
