@@ -763,6 +763,7 @@ function trimBars(c){if(S.bg!=='green')return c;const w=c.width,h=c.height,d=ctx
   while(t<h*0.45&&bar(i=>px(i,t),w))t++;while(b>h*0.55&&bar(i=>px(i,b),w))b--;
   while(l<w*0.45&&bar(i=>px(l,t+i),b-t))l++;while(r>w*0.55&&bar(i=>px(r,t+i),b-t))r--;
   if(t<3&&l<3&&h-1-b<3&&w-1-r<3)return c;return crop(c,l,t,r-l+1,b-t+1)}
+function bgIsGreen(c){const w=c.width,h=c.height,x=ctx(c);let g=0,n=0;const chk=d=>{for(let i=0;i<d.length;i+=16){n++;const r=d[i],gg=d[i+1],b=d[i+2];if(gg>140&&gg-r>70&&gg-b>70)g++}};chk(x.getImageData(0,0,w,3).data);chk(x.getImageData(0,h-3,w,3).data);chk(x.getImageData(0,0,3,h).data);chk(x.getImageData(w-3,0,3,h).data);return n?g/n>0.5:true}
 function touchList(cells,from,to){const out=[];cells.forEach((c,j)=>{if(from+j>=to)return;const x=ctx(c.proc),w=c.proc.width,h=c.proc.height;if(w<6||h<6)return;
   const cnt=(sx,sy,sw,sh)=>{const d=x.getImageData(sx,sy,sw,sh).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>60)n++;return n};
   const lim=v=>Math.max(4,v*0.01);if(cnt(0,0,2,h)>lim(h)||cnt(w-2,0,2,h)>lim(h)||cnt(0,0,w,2)>lim(w)||cnt(0,h-2,w,2)>lim(w))out.push(from+j+1)});return out}
@@ -840,19 +841,22 @@ function textRule(){
   const t=S.txt;let space='';if(!t.overlap){const [c,r]=POS[t.pos]||POS.bc;const side=t.dir==='h'?(r===0?'上':r===2?'下':c===0?'左':c===2?'右':''):(c===0?'左':c===2?'右':'');if(side)space=`各イラストの${side}側に、あとで文字を入れるすき間を少し空ける。`}
   return `【文字】文字・セリフ・吹き出しは一切描かない(文字はあとで入れます)。${space}`;
 }
-function itemLine(i,num){const ph=S.phrases[i]||{t:'',p:''};return S.textMode==='ai'?`${num}. ${ph.t?`「${ph.t}」`:'(文字なし)'} ${ph.p||''}`.trim():`${num}. 気持ち:${ph.t||'自由'}/ポーズ:${ph.p||'自由'}`}
-function charPrompt(){return `LINEスタンプ用のオリジナルキャラクターの見本を1体だけ描いてください。\n【画像の縦横比】1:1(正方形)\n【${charLine()}】\n${tasteBlock()}\n正面向きの全身、にっこり笑顔。文字は入れない。\n【背景】${BGTXT[S.bg]}${extra()}`}
-function sheetPrompt(k){
+function itemLine(i,num){const ph=S.phrases[i]||{t:'',p:''};return S.textMode==='ai'?`${num}. ${ph.t?`「${ph.t}」`:'(文字なし)'} ${ph.p||''}`.trim():`${num}. ${ph.p||'自由なポーズと表情'}`}
+function finalRules(grid){const bg=S.bg==='white'?'背景は全面を真っ白(#FFFFFF)一色にする':'背景は全面を濃い緑(#00FF00)一色にする。薄い緑・模様・影・グラデーションにしない';
+  return `\n\n【最後に必ず守ること】\n・${S.textMode==='ai'?'セリフ以外の文字は入れない':'画像の中に文字・セリフ・吹き出しを一切描かない'}\n・${bg}${grid?'\n・マスの区切り線や枠は描かない\n・キャラ同士は重ねず、すき間を広く空ける':''}`}
+function charPrompt(){return `LINEスタンプ用のオリジナルキャラクターの見本を1体だけ描いてください。\n【画像の縦横比】1:1(正方形)\n【${charLine()}】\n${tasteBlock()}\n正面向きの全身、にっこり笑顔。文字は入れない。\n【背景】${BGTXT[S.bg]}${extra()}${finalRules(false)}`}
+function sheetPrompt(k,gap){
   const p=per(),from=k*p.n,to=Math.min(S.count,from+p.n),items=[];for(let i=from;i<to;i++)items.push(itemLine(i,i-from+1));
   const n=to-from;const lay=n===1?'1枚の画像の中央に1体だけ描く。周りに余白を残す。':`横${p.cols}列×縦${p.rows}行の等間隔のマス目に1体ずつ、左上から右へ順番に並べる。マスの境目に線は引かない。各イラストはマスの中央に少し小さめに収め、となりのイラストと十分すき間を空ける(重ならない・はみ出さない)。`;
   const prev=[];for(let i=0;i<from;i++){const q=S.phrases[i]?.p;if(q)prev.push(q)}
   const vary=n>1?`\n【バリエーション】${n}体すべて違うポーズ・表情・体の向きにする。同じ構図をくり返さない。`:'';
   const avoid=prev.length?`\n【前の回とかぶらないように】前の回で次のポーズを描いたので、同じ構図・同じ動きにしない:${prev.join('、')}`:'';
-  return `${who()}LINEスタンプ用のイラストを${n}個、1枚の画像にまとめて描いてください。\n\n【画像の縦横比】${arText()}\n【配置】${lay}\n【背景】${BGTXT[S.bg]}\n【${charLine()}】どのイラストも同じキャラ・同じ絵柄にする。\n${tasteBlock()}\n${textRule()}${vary}${avoid}${extra()}\n\n【中身】\n${items.join('\n')}`;
+  const gapTxt=gap?`\n【作り直し】前の画像はキャラ同士が近すぎて、1体ずつ切り分けられませんでした。各キャラをマスの中央に今よりひと回り小さく描き、となりとのすき間をキャラの幅の半分以上空ける。机・書類・カバンなどの物もマスからはみ出さないようにする。`:'';
+  return `${who()}LINEスタンプ用のイラストを${n}個、1枚の画像にまとめて描いてください。\n\n【画像の縦横比】${arText()}\n【配置】${lay}${gapTxt}\n【背景】${BGTXT[S.bg]}\n【${charLine()}】どのイラストも同じキャラ・同じ絵柄にする。\n${tasteBlock()}\n${textRule()}${vary}${avoid}${extra()}\n\n【中身(ポーズと表情)】\n${items.join('\n')}${finalRules(n>1)}`;
 }
 function fixPrompt(i){
   const note=$('#edNote').value.trim();const others=S.phrases.slice(0,S.count).map((p,j)=>j!==i&&p.p?p.p:null).filter(Boolean).slice(0,40);
-  return `${who()}LINEスタンプ用のイラスト${has(i)?'を1体だけ作り直して':'を1体だけ描いて'}ください。\n【画像の縦横比】4:3(少し横長)\n【中身】${itemLine(i,1).replace(/^1\. /,'')}\n${note?`【直してほしい所】${note}\n`:''}【${charLine()}】\n${tasteBlock()}\n${textRule()}\n【配置】1枚の画像の中央に1体だけ。周りに余白を残す。\n【背景】${BGTXT[S.bg]}${others.length?`\n【かぶらないように】ほかのスタンプのポーズ(${others.join('、')})とは違う構図にする。`:''}${extra()}`;
+  return `${who()}LINEスタンプ用のイラスト${has(i)?'を1体だけ作り直して':'を1体だけ描いて'}ください。\n【画像の縦横比】4:3(少し横長)\n【中身】${itemLine(i,1).replace(/^1\. /,'')}\n${note?`【直してほしい所】${note}\n`:''}【${charLine()}】\n${tasteBlock()}\n${textRule()}\n【配置】1枚の画像の中央に1体だけ。周りに余白を残す。\n【背景】${BGTXT[S.bg]}${others.length?`\n【かぶらないように】ほかのスタンプのポーズ(${others.join('、')})とは違う構図にする。`:''}${extra()}${finalRules(false)}`;
 }
 
 /* ---------- editable prompts ---------- */
@@ -1031,10 +1035,11 @@ function renderSheets(){
       <p class="list"></p><div class="thumbs"></div>
       <p class="note">${S.ref?'AIアプリに<b>見本画像を添付してから</b>指示文を貼ってください。添付を忘れると絵柄がずれます。':'キャラの見本を作った会話の続きで送ると、絵柄がそろいやすくなります。'}</p>
       <div class="btns"><button class="btn dark" type="button" data-copy="${k}">① 指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a><label class="btn primary">③ できた画像を読み込む<input type="file" accept="image/*" data-sheet="${k}"></label><button class="btn" type="button" data-adjust="${k}" ${p.n>1&&S.sheetSaved&&S.sheetSaved[k]===S.layout?'':'hidden'}>区切りを調整</button></div>
+      ${(S.bgWarn&&S.bgWarn[k])?`<p class="warnline">背景が濃い緑一色になっていません(薄い緑・白・模様など)。背景がうまく消えないことがあるので、作り直しをおすすめします。下の「すき間を広く空けて作り直す指示文」でも、背景と文字の指定を入れ直せます。</p>`:''}
       ${(S.touch&&S.touch[k]&&S.touch[k].length)?`<p class="warnline">${S.touch[k].map(pad).join('・')}番が、となりとくっついているかもしれません。下の「くっついている・ずれているときは」を見てください。</p>`:''}
-      <details class="help" ${(S.touch&&S.touch[k]&&S.touch[k].length)?'open':''}><summary>くっついている・ずれているときは</summary>
+      <details class="help" ${((S.touch&&S.touch[k]&&S.touch[k].length)||(S.bgWarn&&S.bgWarn[k]))?'open':''}><summary>くっついている・ずれている・背景や文字がおかしいときは</summary>
         <ol class="flow small" style="margin-top:8px"><li>「区切りを調整」を押し、赤い線の丸を動かして切り分け直す</li><li>キャラ同士が重なっているときは、下のボタンの指示文をAIに送って作り直してもらう(見本画像も添付)</li><li>それでもだめな番号は、STEP 4の手直しで1個ずつ作り直す</li></ol>
-        <div class="btns" style="margin-top:8px"><button class="btn" type="button" data-copygap="${k}">すき間を広く空けて作り直す指示文をコピー</button></div>
+        <div class="btns" style="margin-top:8px"><button class="btn" type="button" data-copygap="${k}">作り直しの指示文をコピー(すき間・背景・文字なしを強調)</button></div>
       </details>
       <details><summary>指示文を見る・書き換える${pEd()['sheet:'+k]?'(編集済み)':''}</summary><div class="pbox"></div></details>`;
     card.querySelector('.list').textContent=S.phrases.slice(from,to).map(x=>x.t||'(文字なし)').join('・');
@@ -1043,7 +1048,7 @@ function renderSheets(){
     for(let i=from;i<to;i++){const c=renderSt(i,W,H,M,true,true);c.className='checker';th.appendChild(c)}
     box.appendChild(card);
   }
-  box.querySelectorAll('[data-copygap]').forEach(b=>b.addEventListener('click',()=>{const k=Number(b.dataset.copygap);copyText(promptText('sheet:'+k,sheetPrompt(k))+'\n\n【作り直し】前の画像はキャラ同士が近すぎて、1体ずつ切り分けられませんでした。各キャラをマスの中央に今よりひと回り小さく描き、となりとのすき間をキャラの幅の半分以上空けてください。机・書類・カバンなどの物も、マスからはみ出さないようにしてください。')}));
+  box.querySelectorAll('[data-copygap]').forEach(b=>b.addEventListener('click',()=>{const k=Number(b.dataset.copygap);const ed=pEd()['sheet:'+k];copyText(ed?ed.text+'\n\n【作り直し】前の画像はキャラ同士が近すぎて切り分けられませんでした。各キャラをひと回り小さく描き、となりとのすき間を広く空ける。'+finalRules(true):sheetPrompt(k,true))}));
   box.querySelectorAll('[data-adjust]').forEach(b=>b.addEventListener('click',()=>openCut(Number(b.dataset.adjust))));
   box.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const k=Number(b.dataset.copy);copyText(promptText('sheet:'+k,sheetPrompt(k)))}));
   box.querySelectorAll('[data-sheet]').forEach(inp=>inp.addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)await importSheet(f,Number(inp.dataset.sheet))}));
@@ -1053,7 +1058,7 @@ $('#copyChar').addEventListener('click',()=>copyText(promptText('char',charPromp
 async function importSheet(f,k){
   busy(true,'切り分けと透明化をしています…');await tick();
   try{const raw=trimBars(await fileToCanvas(f,2400));const proc=removeBg(raw,60,false);const p=per();const from=k*p.n,to=Math.min(S.count,from+p.n);
-    const cells=p.n===1?[{raw,proc}]:splitSheet(proc,raw,p.cols,p.rows);let ok=0;S.touch=S.touch||{};S.touch[k]=p.n>1?touchList(cells,from,to):[];
+    const cells=p.n===1?[{raw,proc}]:splitSheet(proc,raw,p.cols,p.rows);let ok=0;S.touch=S.touch||{};S.touch[k]=p.n>1?touchList(cells,from,to):[];S.bgWarn=S.bgWarn||{};S.bgWarn[k]=S.bg==='green'&&!bgIsGreen(raw);
     for(let j=0;j<cells.length&&from+j<to;j++){const t=cleanTrim(cells[j].proc);if(!t)continue;newSticker(from+j,cells[j].raw,t);ok++}
     if(p.n>1){try{await DB.set(`sheet:${S.id}:${k}`,{raw:raw.toDataURL('image/png')});S.sheetSaved[k]=S.layout}catch(e){}}
     save();renderSheets();renderRail();
