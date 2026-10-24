@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="AIで作るLINEスタンプの下ごしらえツール。指示文づくり・切り分け・透明化・文字入れ・申請用ZIPまで。">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>スタンプ工房</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=M+PLUS+Rounded+1c:wght@800&family=Kosugi+Maru&family=Hachi+Maru+Pop&family=Yusei+Magic&family=Yomogi&family=Klee+One:wght@600&family=Dela+Gothic+One&family=RocknRoll+One&family=Reggae+One&family=Rampart+One&family=Yuji+Syuku&family=DotGothic16&display=swap">
+<style>
+/* layout: one-column workbench; sticky rail of the six real steps + a "今やること" line; stickers sit on a cutting-mat grid */
+:root{
+  --bg:#EDF1F0; --surface:#FFFFFF; --ink:#1C2629; --muted:#56666A; --line:#D3DCDA;
+  --accent:#D63A5A; --accent-ink:#FFFFFF; --accent-soft:#FBE4E9;
+  --ok:#1D8556; --ok-soft:#DDF2E7; --warn:#9A5800; --warn-soft:#FCEFD9;
+  --mat:#E2E9E7; --check-a:#FFFFFF; --check-b:#E3E7EC; --talk:#8098BB; --bubble:#FFFFFF;
+  --f-display:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
+  --f-body:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --r:16px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121718; --surface:#1B2224; --ink:#E6EDED; --muted:#A2B1B4; --line:#2D383A;
+  --accent:#FF6E89; --accent-ink:#22090F; --accent-soft:#3B1E25;
+  --ok:#4CC38A; --ok-soft:#163327; --warn:#F0A63E; --warn-soft:#3A2A12;
+  --mat:#172022; --check-a:#2B3335; --check-b:#222A2C; --talk:#3D4E66; --bubble:#2B3335; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121718; --surface:#1B2224; --ink:#E6EDED; --muted:#A2B1B4; --line:#2D383A;
+  --accent:#FF6E89; --accent-ink:#22090F; --accent-soft:#3B1E25;
+  --ok:#4CC38A; --ok-soft:#163327; --warn:#F0A63E; --warn-soft:#3A2A12;
+  --mat:#172022; --check-a:#2B3335; --check-b:#222A2C; --talk:#3D4E66; --bubble:#2B3335; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 72px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:980px;margin:0 auto}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.35}
+h1{font-size:28px;font-weight:900;letter-spacing:.02em}
+h2{font-size:25px;font-weight:900}
+h3{font-size:20px;font-weight:700}
+h4{font-size:17px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:15px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:18px 10px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:44px;height:44px;border-radius:13px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-family:var(--f-display);font-weight:900;font-size:22px;transform:rotate(-6deg);box-shadow:0 0 0 3px var(--surface),0 0 0 4px var(--line);flex:0 0 auto}
+.brand small{display:block;color:var(--muted);font-size:14px;font-family:var(--f-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.views{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px}
+.views button{border:0;background:transparent;color:var(--ink);font:inherit;font-weight:700;font-size:16px;padding:8px 18px;border-radius:999px;cursor:pointer;min-height:44px}
+.views button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+nav.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px 6px;margin-inline:-4px}
+.rail-scroll{display:flex;gap:6px;overflow-x:auto;padding:2px 4px;scrollbar-width:none}
+.rail-scroll::-webkit-scrollbar{display:none}
+.rail button{flex:0 0 auto;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 15px 7px 7px;font:inherit;font-size:16px;cursor:pointer;white-space:nowrap;min-height:44px}
+.rail button .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--mat);font-family:var(--f-display);font-weight:900;font-size:15px}
+.rail button .c{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rail button[aria-current="step"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.rail button[aria-current="step"] .n{background:var(--accent);color:var(--accent-ink)}
+.rail button[aria-current="step"] .c{color:inherit;opacity:.75}
+.rail button.done .n{background:var(--ok);color:#fff}
+.nextbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:10px 12px;margin-top:6px}
+.nextbar .lbl{font-size:13px;font-weight:700;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 10px;white-space:nowrap}
+.nextbar p{flex:1;min-width:180px;font-weight:700;font-size:16px;line-height:1.5}
+
+section.step,section.guide{display:grid;gap:18px;padding-top:16px}
+.step-head{display:grid;gap:6px}
+.eyebrow{font-size:14px;letter-spacing:.12em;color:var(--accent);font-weight:700}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:14px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+label.f{display:grid;gap:6px;font-size:16px;font-weight:700}
+.hint{font-weight:400;color:var(--muted);font-size:14px}
+input[type=text],textarea,select{width:100%;font:inherit;font-size:17px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+textarea{min-height:90px;resize:vertical}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible,label.btn:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:10px 18px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;font-size:16px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.dark{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--accent);border-color:var(--accent)}
+.btn.big{min-height:58px;font-size:18px;padding:12px 24px;width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;padding:3px 12px;border-radius:999px;background:var(--mat);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+.note{font-size:15px;color:var(--muted);background:var(--mat);border-radius:12px;padding:12px 14px}
+.next{padding-top:4px}
+.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+
+.choice{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.opt{position:relative;border:1px solid var(--line);border-radius:14px;padding:13px;cursor:pointer;background:var(--bg);display:grid;gap:2px}
+.opt input{position:absolute;opacity:0}
+.opt b{font-family:var(--f-display);font-size:18px}
+.opt span{font-size:14px;color:var(--muted)}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.opt:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+
+.ref-box{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.ref-thumb{width:130px;aspect-ratio:1;border-radius:14px;border:1px dashed var(--line);display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:14px;text-align:center;max-width:100%}
+.ref-thumb img{width:100%;height:100%;object-fit:contain}
+
+.checker{background-color:var(--check-a);background-image:linear-gradient(45deg,var(--check-b) 25%,transparent 25%,transparent 75%,var(--check-b) 75%),linear-gradient(45deg,var(--check-b) 25%,transparent 25%,transparent 75%,var(--check-b) 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.slot{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;min-width:0;align-content:start}
+.slot .pic{position:relative;aspect-ratio:370/320;max-width:100%}
+.slot .pic canvas{width:100%;height:100%;display:block}
+.slot .no{position:absolute;top:6px;left:6px;font-size:13px;font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:0 8px;font-variant-numeric:tabular-nums;z-index:1}
+.slot .badge{position:absolute;top:6px;right:6px;z-index:1;font-size:12px;padding:1px 8px}
+.slot .meta{padding:8px;display:grid;gap:6px;border-top:1px solid var(--line)}
+.slot .meta input{font-size:16px;padding:7px 9px}
+.slot .meta .cnt{font-size:13px;color:var(--muted);text-align:right;margin-top:-4px}
+.slot .meta .cnt.over{color:var(--accent);font-weight:700}
+.slot .meta input.over{border-color:var(--accent);background:var(--accent-soft)}
+.slot .meta input.dup{border-color:var(--warn);background:var(--warn-soft)}
+button.slot{font:inherit;color:inherit;text-align:left;cursor:pointer;padding:0}
+button.slot:hover{border-color:var(--accent)}
+.slot .cap{padding:7px 9px;font-size:15px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.presets button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:10px;font:inherit;cursor:pointer;text-align:left;display:grid;gap:2px}
+.presets button b{font-family:var(--f-display);font-size:16px}
+.presets button span{font-size:13px;color:var(--muted)}
+.presets button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.metacards{display:grid;gap:10px}
+.metacard{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--bg)}
+.metacard .k{font-size:13px;font-weight:700;color:var(--muted)}
+.metacard .v{font-size:16px;white-space:pre-wrap;word-break:break-word}
+.fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:330px;overflow-y:auto;padding:2px}
+.fontopt{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:10px;cursor:pointer;display:grid;gap:2px;text-align:center;font:inherit}
+.fontopt .fs{font-size:24px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fontopt .fn{font-size:13px;color:var(--muted)}
+.fontopt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+.posgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:300px}
+.posgrid button{min-height:46px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.posgrid button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--bg);color:var(--ink);font:inherit;font-size:15px;font-weight:700;padding:10px 16px;cursor:pointer;min-height:46px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.tc{display:grid;gap:14px}
+.tc .lab{font-size:15px;font-weight:700}
+.rng{display:grid;grid-template-columns:7.5em 1fr;gap:10px;align-items:center;font-size:15px}
+.rng input{width:100%;accent-color:var(--accent)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.swatches button{width:38px;height:38px;border-radius:50%;border:2px solid var(--line);cursor:pointer}
+.swatches button[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:2px}
+
+.sheet-card .thumbs{display:grid;gap:4px}
+.sheet-card .thumbs canvas{width:100%;aspect-ratio:370/320;border-radius:6px;display:block}
+.sheet-card .list{font-size:15px;color:var(--muted)}
+details summary{cursor:pointer;font-size:15px;font-weight:700;color:var(--muted);min-height:32px}
+pre.prompt{white-space:pre-wrap;word-break:break-word;font-family:var(--f-body);font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0 0;max-height:300px;overflow:auto}
+.progress{height:8px;border-radius:999px;background:var(--mat);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+
+.bg-switch{display:flex;gap:8px;flex-wrap:wrap}
+.bg-switch button{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:15px;font-weight:700;border-radius:999px;padding:7px 16px;cursor:pointer;min-height:44px}
+.bg-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.overview{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:6px;padding:10px;border-radius:12px;border:1px solid var(--line)}
+.overview canvas{width:100%;aspect-ratio:370/320;display:block}
+.overview.bg-white{background:#fff}
+.overview.bg-black{background:#111}
+.talk{max-width:400px;margin:0 auto;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:var(--talk);display:grid;width:100%}
+.talk-log{height:340px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;gap:8px;align-items:flex-end}
+.msg.me{justify-content:flex-end}
+.msg .av{width:32px;height:32px;border-radius:50%;background:var(--mat);flex:0 0 auto}
+.msg .txt{background:var(--bubble);color:var(--ink);border-radius:16px;padding:7px 12px;font-size:15px;max-width:70%}
+.msg canvas{width:150px;max-width:55%;display:block}
+.talk-pal{background:var(--surface);border-top:1px solid var(--line)}
+.talk-tabs{display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);align-items:center}
+.talk-tabs canvas{width:42px;height:32px;border-bottom:2px solid var(--accent)}
+.talk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;max-height:210px;overflow-y:auto}
+.talk-grid button{border:0;background:transparent;padding:2px;cursor:pointer;border-radius:8px}
+.talk-grid canvas{width:100%;display:block;aspect-ratio:370/320}
+.mt{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.mt figure{margin:0;display:grid;gap:8px;justify-items:start}
+.mt canvas{border-radius:10px;border:1px solid var(--line);max-width:100%}
+
+.count{font-size:14px;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+.count.over{color:var(--accent);font-weight:700}
+.field-row{display:flex;gap:8px;align-items:flex-start}
+.field-row > :first-child{flex:1;min-width:0}
+ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
+.checks{display:grid;gap:10px}
+.checks label{display:flex;gap:10px;align-items:flex-start;font-size:16px;cursor:pointer}
+.checks input{width:22px;height:22px;margin-top:3px;flex:0 0 auto;accent-color:var(--accent)}
+.audit{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.audit li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--bg)}
+.audit li .ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:900;flex:0 0 auto}
+.audit li.ok .ic{background:var(--ok-soft);color:var(--ok)}
+.audit li.ng .ic{background:var(--warn-soft);color:var(--warn)}
+.audit li span.t{flex:1;min-width:180px;font-size:16px}
+.projbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.projbar label.f{flex:1;min-width:200px}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);padding:10px 12px;border-radius:12px;font-size:16px}
+
+/* editor */
+.modal{position:fixed;inset:0;z-index:20;background:rgba(10,14,15,.55);display:flex;align-items:flex-end;justify-content:center;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+.modal .panel{background:var(--surface);width:100%;max-width:780px;max-height:94vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:14px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
+@media (min-width:780px){.modal{align-items:center}.modal .panel{border-radius:20px;max-height:90vh}}
+.ed-head{display:flex;align-items:center;gap:8px}
+.ed-head h3{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-head .btn{min-height:46px;padding:8px 14px}
+.ed-stage{position:relative;max-width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.ed-stage canvas{width:100%;display:block;touch-action:pan-y}
+.ed-stage.erasing canvas{touch-action:none;cursor:crosshair}
+.ed-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.ed-box{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:12px;min-width:0;align-content:start}
+.warnline{font-size:15px;color:var(--warn);font-weight:700}
+
+/* guide */
+.guide article{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:12px;min-width:0}
+.guide .gnum{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--f-display);font-weight:900;margin-right:8px}
+.guide h3{display:flex;align-items:center}
+.guide ul{margin:0;padding-left:1.3em;display:grid;gap:4px}
+.ex{display:grid;gap:8px;background:var(--bg);border-radius:12px;padding:12px}
+.ex .lab{font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--accent)}
+.ex canvas{max-width:100%;height:auto;border-radius:10px;display:block}
+.ex-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ex-row canvas{flex:1 1 140px;min-width:0;width:100%}
+.arrow{font-size:26px;font-weight:900;color:var(--accent)}
+.qa{display:grid;gap:10px}
+.qa details{background:var(--bg);border-radius:12px;padding:10px 14px}
+.qa summary{font-size:16px;color:var(--ink)}
+.qa p{margin-top:6px;font-size:15px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:15px}
+.kv b{white-space:nowrap}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:999px;font-size:16px;font-weight:700;z-index:30;max-width:calc(100% - 32px);text-align:center}
+.busy{position:fixed;inset:0;z-index:40;background:rgba(10,14,15,.45);display:grid;place-items:center}
+.busy div{background:var(--surface);color:var(--ink);padding:18px 24px;border-radius:14px;font-weight:700}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">ス</div>
+    <div style="min-width:0"><h1>スタンプ工房</h1><small id="hdrSub">セット:—</small></div>
+  </div>
+  <div class="views" role="group" aria-label="表示の切り替え">
+    <button type="button" id="viewMake" aria-pressed="true">作る</button>
+    <button type="button" id="viewGuide" aria-pressed="false">使い方</button>
+  </div>
+</header>
+
+<div id="makeView">
+<nav class="rail" aria-label="作業の順番">
+  <div class="rail-scroll" id="rail"></div>
+</nav>
+<div class="nextbar" id="nextbar"><span class="lbl">今やること</span><p id="nextText"></p><button class="btn primary" type="button" id="nextGo">ここへ移動</button></div>
+
+<main>
+<!-- 1 -->
+<section class="step" data-step="1">
+  <div class="step-head"><span class="eyebrow">STEP 1</span><h2>準備</h2><p class="muted">どんなスタンプを作るか決めます。入力はこの端末に自動で保存されます。</p></div>
+  <div class="card">
+    <h3>スタンプのセット</h3>
+    <div class="projbar">
+      <label class="f">作業中のセット<select id="projSel"></select></label>
+      <label class="f">セットの名前<input type="text" id="projName"></label>
+    </div>
+    <div class="btns"><button class="btn" type="button" id="projNew">新しいセットを作る</button><button class="btn" type="button" id="projDup">このセットを複製</button></div>
+    <div class="btns"><button class="btn" type="button" id="bkSave">バックアップを保存</button><label class="btn">バックアップから読み込む<input type="file" id="bkLoad" accept=".json,application/json"></label></div>
+    <div class="btns" id="projDelArea"><button class="btn danger" type="button" id="projDel">このセットを削除</button></div>
+    <p class="small muted">データはこの端末のブラウザにだけ保存されます。別の端末で続けるときや、念のための保存には「バックアップを保存」を使ってください。</p>
+  </div>
+  <div class="card">
+    <h3>画像を作るAI</h3>
+    <div class="choice">
+      <label class="opt"><input type="radio" name="prov" value="gemini"><b>Gemini</b><span>Googleのアプリ</span></label>
+      <label class="opt"><input type="radio" name="prov" value="chatgpt"><b>ChatGPT</b><span>OpenAIのアプリ</span></label>
+      <label class="opt"><input type="radio" name="prov" value="other"><b>その他</b><span>名前とURLを入力</span></label>
+    </div>
+    <div class="grid2" id="customAi" hidden>
+      <label class="f">AIの名前<input type="text" id="customName" placeholder="例:Copilot"></label>
+      <label class="f">開くURL<input type="text" id="customUrl" placeholder="https://"></label>
+    </div>
+    <p class="note" id="provNote"></p>
+  </div>
+  <div class="card">
+    <h3>キャラクターとテーマ</h3>
+    <div style="display:grid;gap:8px"><span class="small" style="font-weight:700">参考例から選ぶ(テーマ・絵柄・セリフがまとめて入ります)</span><div class="presets" id="presets"></div><div id="presetConfirm"></div></div>
+    <label class="f">キャラ・テーマ(自由入力)<span class="hint">色と形の特徴も書くと精度が上がります。例:頭と背中が紺色、おなかが白、くちばしと足がオレンジのペンギン</span><input type="text" id="theme" placeholder="全身が白、耳の内側がピンクの、ぽっちゃりした白ねこ"></label>
+    <label class="f">キャラの名前(タイトル用・短く)<span class="hint">ストアのタイトルや説明文に使います。例:ふさふさダックス</span><input type="text" id="charName" placeholder="ふさふさダックス"></label>
+    <p class="small" id="themeHint" style="color:var(--warn);font-weight:700" hidden>テーマが短めです。「◯◯色の体」「おなかは白」など、色と形の特徴を書き足すと、狙ったキャラになりやすくなります。</p>
+    <div style="display:grid;gap:8px"><span class="small" style="font-weight:700">絵柄(線の太さ・描き込み量・目の描き方まで、指示文に具体的に入ります)</span><div class="choice" id="tasteOpts"></div></div>
+    <details><summary>絵柄の指定内容を見る</summary><pre class="prompt" id="tastePreview"></pre></details>
+    <label class="f">絵柄の追加メモ(自由入力)<span class="hint">例:ほっぺは丸いピンク、しっぽは短め</span><input type="text" id="style" placeholder="ほっぺは丸いピンク、しっぽは短め"></label>
+    <label class="f">自分のプロンプト(自由入力)<span class="hint">ここに書いた内容は、すべての指示文に追加されます</span><textarea id="userPrompt" placeholder="例:ほっぺはピンク。しっぽは短め。"></textarea></label>
+  </div>
+  <div class="card">
+    <h3>キャラの見本画像(任意)</h3>
+    <div class="ref-box">
+      <div class="ref-thumb" id="refThumb">見本なし</div>
+      <div style="display:grid;gap:10px;min-width:0;flex:1">
+        <p class="small muted">手持ちのキャラ画像があれば入れてください。下書きに表示され、指示文も「添付画像と同じキャラで」に変わります。AIアプリにも同じ画像を添付してください。</p>
+        <div class="btns"><label class="btn">画像を選ぶ<input type="file" id="refFile" accept="image/*"></label><button class="btn ghost" type="button" id="refClear">見本を外す</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>作り方の設定</h3>
+    <div class="grid2">
+      <label class="f">スタンプの個数<select id="count"><option>8</option><option>16</option><option>24</option><option>32</option><option>40</option></select></label>
+      <label class="f">1回の生成で作る数<span class="hint">少ないほど1個がきれい。生成回数は増えます</span>
+        <select id="layout"><option value="4x2">8個(横4×縦2)</option><option value="2x2">4個(横2×縦2)</option><option value="1x1">1個ずつ</option></select></label>
+      <label class="f">画像の縦横比<span class="hint">「自動」は作る数に合わせて決めます</span>
+        <select id="aspect"><option value="auto">自動(おすすめ)</option><option value="16:9">16:9(横長)</option><option value="3:2">3:2(やや横長)</option><option value="4:3">4:3(少し横長)</option><option value="1:1">1:1(正方形)</option></select></label>
+      <label class="f">背景の指定<span class="hint">緑がいちばん安定して透明にできます</span>
+        <select id="bg"><option value="green">緑一色(おすすめ)</option><option value="white">白一色</option></select></label>
+    </div>
+    <div id="layoutConfirm"></div>
+  </div>
+  <div class="next"><button class="btn primary big" type="button" data-go="2">次へ:下書きと文字 →</button></div>
+</section>
+
+<!-- 2 -->
+<section class="step" data-step="2" hidden>
+  <div class="step-head"><span class="eyebrow">STEP 2</span><h2>下書きと文字</h2><p class="muted">セリフ・ポーズと文字のデザインを決めます。下の一覧が完成イメージです。</p></div>
+  <div class="card">
+    <h3>文字の入れ方</h3>
+    <div class="choice">
+      <label class="opt"><input type="radio" name="tmode" value="system"><b>このページで入れる</b><span>おすすめ。位置・フォント・縦書きを自由に選べます</span></label>
+      <label class="opt"><input type="radio" name="tmode" value="ai"><b>AIに描かせる</b><span>手軽ですが、位置や字は思い通りになりにくいです</span></label>
+    </div>
+  </div>
+  <div class="card" id="textCard">
+    <h3>文字のデザイン(全部に使われます)</h3>
+    <div id="globalTc"></div>
+  </div>
+  <div class="card">
+    <h3>セリフのテンプレート</h3>
+    <div class="projbar"><label class="f">用途を選ぶ<select id="tplSel"></select></label><button class="btn" type="button" id="tplUse">このテンプレートを使う</button></div>
+    <div id="tplConfirm"></div>
+    <div style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">
+      <h4>AIにセリフを考えてもらう(テーマに合わせて作ります)</h4>
+      <div class="projbar"><label class="f">雰囲気<select id="moodSel"><option value="humor">クスッと笑えるユーモア</option><option value="cute">かわいい・やさしい</option><option value="polite">ていねい・仕事向け</option></select></label><button class="btn primary" type="button" id="genPhrases" data-needs-sample hidden>Claudeで作って入れる</button></div>
+      <p class="small muted" data-needs-sample hidden>今のセリフとポーズは置き換わります。30秒〜1分ほどかかります。初回だけ、Claudeを使ってよいか確認が出ます。</p>
+      <p class="note" data-no-sample>下の「Geminiで作る」で、指示文をコピー → Geminiに貼る → 答えを貼り付けて取り込みます。</p>
+      <p class="warnline" id="genPhrasesMsg" hidden></p>
+    </div>
+    <details><summary>予備:Geminiで作る</summary>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <div class="btns"><button class="btn dark" type="button" id="copyPhrasePrompt">① 指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a></div>
+        <label class="f">③ AIの答えを貼り付け<span class="hint">1行に1個「決めゼリフ/ポーズ/前置き」の形。番号が付いていても大丈夫です</span><textarea id="phrasePaste" placeholder="感謝!/洗濯かごを抱えてキラキラ/洗濯物"></textarea></label>
+        <div class="btns"><button class="btn primary" type="button" id="phraseImport">取り込む</button></div>
+      </div>
+    </details>
+    <p class="small muted" id="dupNote"></p>
+  </div>
+  <div class="slots" id="draftSlots"></div>
+  <div class="next"><button class="btn primary big" type="button" data-go="3">次へ:AIで生成 →</button></div>
+</section>
+
+<!-- 3 -->
+<section class="step" data-step="3" hidden>
+  <div class="step-head"><span class="eyebrow">STEP 3</span><h2>AIで生成</h2><p class="muted">上から順に、①指示文をコピー → ②AIアプリに貼って生成 → ③できた画像を読み込む、をくり返します。</p></div>
+  <div class="card">
+    <div class="row"><h3>進み具合</h3><span class="pill" id="genCount">0/40</span></div>
+    <div class="progress"><i id="genBar"></i></div>
+  </div>
+  <div class="card" id="charCard">
+    <h3>はじめに:キャラの見本を作る(見本画像がない場合)</h3>
+    <p class="small muted">先にキャラを1体作り、気に入ったら保存してSTEP 1で見本画像として読み込みます。絵柄がそろいやすくなります。</p>
+    <div class="btns"><button class="btn dark" type="button" id="copyChar">見本の指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a></div>
+    <details><summary>指示文を見る</summary><pre class="prompt" id="charPrompt"></pre></details>
+  </div>
+  <div id="sheets" style="display:grid;gap:14px"></div>
+  <div class="card">
+    <h3>手持ちの完成画像をそのまま使う</h3>
+    <p class="small muted">1枚に1キャラの画像を複数選ぶと、空いている枠に順番に入ります。背景は自動で透明にします。</p>
+    <div class="btns"><label class="btn">画像を選ぶ(複数可)<input type="file" id="ownFiles" accept="image/*" multiple></label></div>
+  </div>
+  <div class="next"><button class="btn primary big" type="button" data-go="4">次へ:1個ずつ手直し →</button></div>
+</section>
+
+<!-- 4 -->
+<section class="step" data-step="4" hidden>
+  <div class="step-head"><span class="eyebrow">STEP 4</span><h2>1個ずつ手直し</h2><p class="muted">直したいスタンプをタップします。黄色のマークが付いたものは、直したほうがよい所があります。</p></div>
+  <div class="btns"><span class="pill" id="fixSummary"></span></div>
+  <div class="slots" id="fixSlots"></div>
+  <div class="next"><button class="btn primary big" type="button" data-go="5">次へ:完成プレビュー →</button></div>
+</section>
+
+<!-- 5 -->
+<section class="step" data-step="5" hidden>
+  <div class="step-head"><span class="eyebrow">STEP 5</span><h2>完成プレビュー</h2><p class="muted">白フチの残りや欠けがないか、背景を変えて確認します。</p></div>
+  <div class="card">
+    <div class="bg-switch" role="group" aria-label="背景">
+      <button type="button" data-bgv="checker" aria-pressed="true">市松模様</button>
+      <button type="button" data-bgv="white" aria-pressed="false">白</button>
+      <button type="button" data-bgv="black" aria-pressed="false">黒</button>
+      <button type="button" data-bgv="talk" aria-pressed="false">トーク画面</button>
+    </div>
+    <div id="overview" class="overview checker"></div>
+    <div id="talkView" hidden>
+      <div class="talk">
+        <div class="talk-log" id="talkLog"><div class="msg"><div class="av"></div><div class="txt">明日10時に駅前ね!</div></div></div>
+        <div class="talk-pal"><div class="talk-tabs"><canvas id="talkTab" width="96" height="74"></canvas><span class="small muted">タップで送信</span></div><div class="talk-grid" id="talkGrid"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>メイン画像・タブ画像</h3>
+    <p class="small muted">ストアで表示されるメイン画像(240×240)と、トーク画面のタブ画像(96×74)を選びます。</p>
+    <div class="mt">
+      <figure><canvas id="mainCv" width="240" height="240" class="checker"></canvas><label class="f">メインに使う番号<select id="mainSel"></select></label></figure>
+      <figure><canvas id="tabCv" width="96" height="74" class="checker"></canvas><label class="f">タブに使う番号<select id="tabSel"></select></label></figure>
+    </div>
+  </div>
+  <div class="next"><button class="btn primary big" type="button" data-go="6">次へ:申請の準備 →</button></div>
+</section>
+
+<!-- 6 -->
+<section class="step" data-step="6" hidden>
+  <div class="step-head"><span class="eyebrow">STEP 6</span><h2>申請の準備</h2><p class="muted">自動チェックを確認し、ZIPを保存して、文章を貼るだけの状態にします。</p></div>
+  <div class="card">
+    <div class="row"><h3>申請前の自動チェック</h3><button class="btn" type="button" id="auditRun">もう一度チェック</button></div>
+    <ul class="audit" id="audit"></ul>
+  </div>
+  <div class="card">
+    <div class="row"><h3>申請用ZIP</h3><span class="pill" id="zipState"></span></div>
+    <p class="small muted">中身:01.png〜<span id="zipLast">40</span>.png(370×320・背景透明・余白10px)、main.png、tab.png</p>
+    <div class="btns"><button class="btn primary" type="button" id="zipBtn">ZIPを保存</button><button class="btn" type="button" id="sheetBtn">宣伝用の一覧画像を保存</button></div>
+  </div>
+  <div class="card">
+    <div class="row"><h3>タイトル・説明文</h3></div>
+    <div class="btns"><button class="btn primary" type="button" id="genMeta" data-needs-sample hidden>Claudeで3案を作る</button><button class="btn" type="button" id="autoMeta">かんたん下書きを入れる</button></div>
+    <p class="small muted"><span data-needs-sample hidden>「Claudeで3案を作る」を押すと、ここに3案が並びます。気に入った案の「この案を使う」で、下の4つの欄に入ります(10〜60秒ほど)。</span>「かんたん下書き」は、キャラの名前とセリフの種類から下書きを入れます。</p>
+    <div id="metaCards" class="metacards"></div>
+    <details><summary>予備:Geminiで作る</summary><div class="btns" style="margin-top:8px"><button class="btn dark" type="button" id="copyMetaPrompt">指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a></div><p class="small muted" style="margin-top:6px">Geminiの答えから気に入った案を、下の欄にコピーして貼ってください。</p></details>
+    <div id="metaFields" style="display:grid;gap:14px"></div>
+    <div class="btns"><button class="btn" type="button" id="copyEnPrompt">英語版を作る指示文をコピー</button></div>
+    <p class="small muted">英語のタイトル・説明文も必要です。上のボタンの指示文をAIアプリに貼ると、英語に訳してくれます。</p>
+  </div>
+  <div class="card">
+    <h3>申請の手順</h3>
+    <ol class="flow">
+      <li>LINE Creators Marketにログイン(初回はクリエイター登録)</li>
+      <li>「新規登録」→ タイプは<b>スタンプ</b>(あとから変更不可)</li>
+      <li>タイトル・説明文・クリエイター名・コピーライトを貼り付け</li>
+      <li>「AIの使用」で<b>AIを使用しています</b>を選択</li>
+      <li>ZIPをアップロード → 個数と中身を確認してリクエスト</li>
+    </ol>
+    <div class="btns"><a class="btn dark" href="https://creator.line.me/ja/" target="_blank" rel="noopener">LINE Creators Marketを開く ↗</a></div>
+    <div class="checks" id="checks"></div>
+    <p class="small muted">規格や審査のルールは変わることがあります。申請の直前に公式の制作ガイドラインも確認してください。</p>
+  </div>
+</section>
+</main>
+</div>
+
+<!-- guide -->
+<section class="guide" id="guideView" hidden>
+  <div class="step-head"><span class="eyebrow">GUIDE</span><h2>スタンプ工房の使い方</h2><p class="muted">STEP 1から順に進めれば、申請用のZIPができあがります。各STEPの参考例もあわせて見てください。</p></div>
+  <article>
+    <h3><span class="gnum">1</span>準備</h3>
+    <ul><li>作るスタンプのセットを選びます(何セットでも作れます)</li><li>使うAI(Gemini・ChatGPTなど)を選びます</li><li>キャラは参考例10種から選ぶか、自由に入力します。選ぶとテーマ・絵柄・セリフがまとめて入ります</li><li>絵柄(ゆる手描き・太線ポップなど)を選ぶと、線の太さや目の描き方まで具体的な指定が指示文に入ります</li><li>手持ちのキャラ画像があれば見本として入れます</li></ul>
+    <div class="ex"><span class="lab">参考例</span><div class="kv"><b>キャラ・テーマ</b><span>ぽっちゃりした白ねこ</span><b>絵柄</b><span>ゆる手描き(一定の太さの手描き線・目は黒い丸・影なし)</span><b>自分のプロンプト</b><span>ほっぺはピンク。しっぽは短め。</span><b>個数</b><span>40個/1回に8個/縦横比は自動</span></div></div>
+  </article>
+  <article>
+    <h3><span class="gnum">2</span>下書きと文字</h3>
+    <ul><li>セリフとポーズを決めます。テンプレート(日常・ユーモア3種・敬語・家族・カップル・季節)から選ぶか、「Claudeで作って入れる」でテーマに合わせた40個をその場で作れます(予備としてGeminiに頼む方法もあります)</li><li>ユーモア系は「前置き(小)+決めゼリフ(大)」の2段構成。文字のフチを「二重フチ(強調)」、色を赤にすると目立ちます</li><li>同じセリフやポーズがあると黄色で知らせます</li><li>文字は「このページで入れる」がおすすめ。フォント・位置(9か所)・横書き/縦書き・色・フチを選べます</li><li>文字の大きさは「1か所の最大文字数」で決まり、全部のスタンプでそろいます</li><li>「+ 2か所目の文字」で、もう1か所に文字を入れられます(大きさは同じ・7割・3割から選択)</li></ul>
+    <div class="ex"><span class="lab">参考例:文字の位置と書き方</span><div id="gx2" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"></div></div>
+  </article>
+  <article>
+    <h3><span class="gnum">3</span>AIで生成</h3>
+    <ul><li>「指示文をコピー」→「AIを開く」→ 見本画像を添付して貼り付け → 送信</li><li>できた画像を保存し、「できた画像を読み込む」で選びます</li><li>読み込むと、自動で切り分け・背景の透明化・サイズ調整をします</li><li>キャラ同士が近くて切り分けがずれたら「区切りを調整」で赤い線を動かします</li></ul>
+    <div class="ex"><span class="lab">参考例:AIが作る画像(緑背景)→ 読み込み後</span><div class="ex-row" id="gx3"></div></div>
+    <div class="ex"><span class="lab">参考例:指示文の一部</span><pre class="prompt" style="margin:0">添付した画像のキャラクターと同じキャラで、LINEスタンプ用のイラストを8個、1枚の画像にまとめて描いてください。
+【画像の縦横比】16:9(横長)
+【配置】横4列×縦2行の等間隔のマス目に1体ずつ…
+【背景】背景は全面を単色の明るい緑(#00FF00)で塗りつぶす…
+【文字】文字・セリフ・吹き出しは一切描かない…
+【バリエーション】8体すべて違うポーズ・表情・向きにする…</pre></div>
+  </article>
+  <article>
+    <h3><span class="gnum">4</span>1個ずつ手直し</h3>
+    <ul><li>黄色の「余白」マークは、絵が端から10pxの内側に収まっていない印です</li><li>タップして「大きさ」を下げるか、位置をずらします</li><li>緑の消し残しは消しゴムでなぞるか、「背景を消し直す」を使います。消しすぎたら「1つ戻す」</li><li>気に入らない1個は「作り直しの指示文」でAIに作り直してもらい、差し替えます</li></ul>
+    <div class="ex"><span class="lab">参考例:直す前 → 直した後</span><div class="ex-row" id="gx4"></div></div>
+  </article>
+  <article>
+    <h3><span class="gnum">5</span>完成プレビュー</h3>
+    <ul><li>背景を「黒」にすると、白フチの残りがよくわかります</li><li>「トーク画面」では、下のスタンプをタップすると送ったときの見え方になります</li><li>メイン画像・タブ画像に使う1個を選びます</li></ul>
+    <div class="ex"><span class="lab">参考例:トーク画面での見え方</span><div class="ex-row" id="gx5"></div></div>
+  </article>
+  <article>
+    <h3><span class="gnum">6</span>申請の準備</h3>
+    <ul><li>自動チェックで黄色の項目があれば、「直す」から該当の場所へ移動します</li><li>タイトル・説明文は「Claudeで3案を作る」を押し、気に入った案の「この案を使う」を押すだけで入ります(STEP 1の「キャラの名前」が使われます)</li><li>コピーライトは半角英数字のみ。例:(C) クリエイター名</li><li>ZIPを保存し、タイトル・説明文をコピーして LINE Creators Market に貼り付けます</li><li>「AIの使用」は「AIを使用しています」を選びます</li></ul>
+    <div class="ex"><span class="lab">参考例:ZIPの中身</span><div class="kv"><b>01.png〜40.png</b><span>370×320、背景透明、余白10px</span><b>main.png</b><span>240×240(ストアの代表画像)</span><b>tab.png</b><span>96×74(トーク画面のタブ)</span></div></div>
+  </article>
+  <article>
+    <h3>つまずいたとき</h3>
+    <div class="qa">
+      <details><summary>緑色が残ってしまう</summary><p>STEP 4でそのスタンプを開き、「背景の消し具合」を右に動かして「背景を消し直す」。細かい所は消しゴムでなぞってください。</p></details>
+      <details><summary>キャラ同士がくっついて、うまく切り分けられない</summary><p>STEP 3の「区切りを調整」で赤い線を動かして切り分け直せます。重なっている場合は、AIに「もっとすき間を空けて」と頼むか、「1回の生成で作る数」を4個か1個ずつに変えてください。</p></details>
+      <details><summary>回ごとにキャラの絵柄が変わってしまう</summary><p>毎回、見本画像をAIに添付してから指示文を貼ってください。同じ会話の続きで頼むのも効果があります。</p></details>
+      <details><summary>同じようなポーズばかりになる</summary><p>STEP 2でポーズの欄を具体的に書き換えてください(例:「手を振る」→「右手を大きく振ってジャンプ」)。かぶった1個は手直しで作り直せます。</p></details>
+      <details><summary>ZIPが保存できない</summary><p>保存の確認が出たら許可してください。それでもだめなときは、ページを開き直してからもう一度押してください。</p></details>
+      <details><summary>データが消えた・別の端末で続けたい</summary><p>STEP 1の「バックアップを保存」でファイルにしておき、別の端末で「バックアップから読み込む」を使ってください。</p></details>
+    </div>
+  </article>
+  <div class="next"><button class="btn primary big" type="button" id="guideBack">作る画面に戻る</button></div>
+</section>
+</div>
+
+<div class="modal" id="ed" hidden role="dialog" aria-modal="true" aria-labelledby="edTitle">
+  <div class="panel">
+    <div class="ed-head">
+      <button class="btn ghost" type="button" id="edPrev" aria-label="前のスタンプ">←</button>
+      <h3 id="edTitle"></h3>
+      <button class="btn ghost" type="button" id="edNext" aria-label="次のスタンプ">→</button>
+      <button class="btn dark" type="button" id="edClose">完了</button>
+    </div>
+    <div class="ed-stage checker" id="edStage"><canvas id="edCv" width="370" height="320"></canvas></div>
+    <p class="warnline" id="edWarn" hidden></p>
+    <div class="ed-cols">
+      <div class="ed-box" data-need="img">
+        <h4>位置と大きさ</h4>
+        <div class="rng"><span>大きさ</span><input type="range" id="edScale" min="40" max="100" step="1"></div>
+        <div class="rng"><span>左右</span><input type="range" id="edDx" min="-25" max="25" step="1"></div>
+        <div class="rng"><span>上下</span><input type="range" id="edDy" min="-25" max="25" step="1"></div>
+      </div>
+      <div class="ed-box">
+        <h4>文字</h4>
+        <label class="f">セリフ<input type="text" id="edText"></label>
+        <div id="edSub"></div>
+        <p class="small muted" id="edAiNote" hidden>文字はAIに描かせる設定です。<label class="checks"><span style="display:flex;gap:8px"><input type="checkbox" id="edForce">この1個だけ、このページで文字を入れる</span></label></p>
+        <div id="edTcWrap">
+          <p class="small muted" id="edTsState"></p>
+          <div id="edTc"></div>
+          <div class="btns" style="margin-top:10px"><button class="btn ghost" type="button" id="edTsReset">全体の設定に戻す</button><button class="btn" type="button" id="edTsAll">この設定を全部に使う</button></div>
+        </div>
+      </div>
+      <div class="ed-box" data-need="img">
+        <h4>消しゴム・背景</h4>
+        <div class="btns"><button class="btn" type="button" id="edErase" aria-pressed="false">消しゴム:オフ</button><button class="btn" type="button" id="edUndo" disabled>1つ戻す</button></div>
+        <div class="rng"><span>消しゴムの太さ</span><input type="range" id="edBrush" min="4" max="60" step="1" value="18"></div>
+        <div class="rng"><span>背景の消し具合</span><input type="range" id="edTol" min="20" max="150" step="1"></div>
+        <div class="checks"><label><input type="checkbox" id="edGlobal">キャラに囲まれた背景も消す</label></div>
+        <div class="btns"><button class="btn" type="button" id="edRedo">背景を消し直す</button><button class="btn ghost" type="button" id="edReset">読み込んだ直後に戻す</button></div>
+      </div>
+      <div class="ed-box">
+        <h4>AIで作り直す</h4>
+        <textarea id="edNote" placeholder="直してほしい所(例:線を太く、もっと笑顔に)"></textarea>
+        <div class="btns"><button class="btn dark" type="button" id="edCopy">作り直しの指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a></div>
+        <div class="btns"><label class="btn primary">作り直した画像を読み込む<input type="file" id="edFile" accept="image/*"></label></div>
+        <div class="btns" id="edClearArea" data-need="img"><button class="btn danger" type="button" id="edClear">この枠を空にする</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="cutM" hidden role="dialog" aria-modal="true" aria-labelledby="cutTitle">
+  <div class="panel">
+    <div class="ed-head"><h3 id="cutTitle">区切りの調整</h3><button class="btn dark" type="button" id="cutClose">やめる</button></div>
+    <p class="small muted">赤い線の丸をドラッグして、キャラが1体ずつ枠に入るように動かします。番号は左上に表示されています。</p>
+    <div class="ed-stage"><canvas id="cutCv" style="touch-action:none;width:100%;display:block"></canvas></div>
+    <div class="btns"><button class="btn primary" type="button" id="cutApply">この区切りで切り分ける</button><button class="btn" type="button" id="cutAuto">自動の区切りに戻す</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="busy" id="busy" hidden><div id="busyText">処理しています…</div></div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const W=370,H=320,M=10;
+
+const PROVIDERS={
+  gemini:{name:'Gemini',url:'https://gemini.google.com/app',note:'Geminiは本当の透明背景を作れないため、緑一色の背景で作り、このページで透明にします。見本画像は入力欄の「+」から添付してから指示文を貼ってください。'},
+  chatgpt:{name:'ChatGPT',url:'https://chatgpt.com/',note:'ChatGPTは透明背景でも作れますが、緑一色のほうが切り分けが安定します。見本画像は添付してから指示文を貼ってください。'},
+  other:{name:'その他のAI',url:'',note:'画像を作れるAIならどれでも使えます。指示文の中身は同じです。'}
+};
+const BGTXT={
+  green:'背景は全面を単色の明るい緑(#00FF00)で塗りつぶす。模様・影・グラデーション・床は描かない。キャラには緑色を使わない。',
+  white:'背景は全面を真っ白(#FFFFFF)一色にする。模様・影・床は描かない。',
+  clear:'背景は透明(透過PNG)にする。白や市松模様を絵として描かない。'
+};
+const FONTS=[
+  {k:'zenmaru',n:'まるゴシック',f:'Zen Maru Gothic',w:900},{k:'mplusr',n:'まる太ゴシック',f:'M PLUS Rounded 1c',w:800},
+  {k:'kosugi',n:'やさしい丸文字',f:'Kosugi Maru',w:400},{k:'hachi',n:'ポップ手書き',f:'Hachi Maru Pop',w:400},
+  {k:'yusei',n:'マジック手書き',f:'Yusei Magic',w:400},{k:'yomogi',n:'ゆるい手書き',f:'Yomogi',w:400},
+  {k:'klee',n:'教科書風',f:'Klee One',w:600},{k:'dela',n:'極太ゴシック',f:'Dela Gothic One',w:400},
+  {k:'rock',n:'ロック',f:'RocknRoll One',w:400},{k:'reggae',n:'力強い',f:'Reggae One',w:400},
+  {k:'rampart',n:'立体文字',f:'Rampart One',w:400},{k:'syuku',n:'筆文字',f:'Yuji Syuku',w:400},{k:'dot',n:'ドット',f:'DotGothic16',w:400}];
+const POSL=[['tl','左上'],['tc','上'],['tr','右上'],['ml','左'],['mc','真ん中'],['mr','右'],['bl','左下'],['bc','下'],['br','右下']];
+const POS={tl:[0,0],tc:[1,0],tr:[2,0],ml:[0,1],mc:[1,1],mr:[2,1],bl:[0,2],bc:[1,2],br:[2,2]};
+const COLORS=['#1C2629','#FFFFFF','#D63A5A','#2F6FDB','#1D8556','#F29A00','#7A4BD1','#8A5A2B'];
+const T=s=>s.split(';').map(x=>x.split('/').map(y=>y.trim())).filter(x=>x[0]);
+const TPL={
+ daily:{n:'日常(あいさつ・返事)',l:T('おはよう/手を振って笑顔;おやすみ/まくらを抱えて眠そう;ありがとう/ぺこりとおじぎ;了解!/敬礼;OK/両手で大きな丸;よろしく/にっこりおじぎ;ごめんね/両手を合わせて謝る;おつかれさま/お茶を差し出す;いいね!/親指を立てる;すごい!/目をキラキラさせる;うれしい/ぴょんと跳ねる;かなしい/涙目でしょんぼり;えーっ!?/びっくりして飛び上がる;なるほど/あごに手を当てる;がんばって/ポンポンで応援;まかせて/胸をどんとたたく;ちょっと待って/手のひらを前に出す;いまどこ?/きょろきょろ探す;今から帰る/走っている;りょ/片手をさっと上げる;おめでとう/クラッカーを鳴らす;だいすき/ハートを抱きしめる;ねむい/大きなあくび;おなかすいた/おなかを押さえる;ドンマイ/肩をぽんとたたく;ひらめいた!/頭の上に電球;ムリ…/ぐったり寝そべる;はーい/元気に手を上げる;またね/手を振って去っていく;おいしい/もぐもぐ食べる;わかった/うんうんうなずく;え?/首をかしげる;ぷんぷん/ほっぺをふくらませて怒る;てへ/舌を出してウインク;楽しみ!/わくわくして体をゆらす;お願い!/両手を合わせて拝む;よかった〜/ほっと胸をなでおろす;考え中…/腕を組んで考える;おじゃまします/ドアからそっとのぞく;また明日/夕日を背に手を振る')},
+ keigo:{n:'敬語・仕事',l:T('おはようございます/丁寧におじぎ;お疲れさまです/お茶を差し出す;ありがとうございます/深くおじぎ;承知しました/敬礼;よろしくお願いします/両手をそろえておじぎ;申し訳ありません/深々と頭を下げる;確認します/書類をのぞきこむ;了解です/指でOKサイン;お先に失礼します/かばんを持って手を振る;少々お待ちください/手のひらを前に出す;助かります/手を合わせて感謝;さすがです/拍手する;素晴らしいです/目を輝かせる;かしこまりました/胸に手を当てる;恐縮です/照れながらおじぎ;お願いいたします/両手を合わせる;今向かっています/走っている;遅れます/汗をかいて走る;了解しました!/元気に手を上げる;お大事に/薬を差し出す;おめでとうございます/クラッカーを鳴らす;失礼いたします/そっとドアを開ける;確認しました/チェックマークを掲げる;ご連絡ください/電話を持つ;本日もよろしくです/ガッツポーズ;感謝です/花束を渡す;がんばります/腕まくり;検討します/腕を組んで考える;後ほどご連絡します/手帳にメモ;お疲れさまでした/ほっと一息;いいですね/親指を立てる;なるほどです/うなずく;ありがとうございました/花を持っておじぎ;お手数おかけします/申し訳なさそうに頭をかく;大丈夫です/胸を張る;了解いたしました/ペンでメモを取る;ご確認お願いします/書類を差し出す;会議中です/口に指を当てて静かに;本日はお休みです/ハンモックでのんびり;よい週末を/手を振って笑顔')},
+ family:{n:'家族',l:T('今から帰るよ/走って帰る;ごはんできたよ/おたまを持つ;何時に帰る?/時計を見る;迎えに来て/車を指さす;買ってきて/買い物メモを見せる;了解!/敬礼;ありがとう/おじぎ;おやすみ/ふとんで眠る;おはよう/大きくのびをする;気をつけてね/手を振って見送る;着いたよ/ばんざい;寝坊した!/あわてて飛び起きる;牛乳ある?/冷蔵庫をのぞく;今日なに食べたい?/首をかしげる;お風呂わいたよ/湯気の出る桶を持つ;洗濯物よろしく/洗濯かごを持つ;電話して/電話を持つ;先に寝るね/まくらを抱える;遅くなる/ごめんのポーズ;お疲れさま/肩をもむ;大好きだよ/ハートを抱える;がんばったね/頭をなでる;雨降ってるよ/傘をさす;傘持ってって/傘を差し出す;楽しかったね/にっこり笑う;写真送ってね/スマホを見せる;誕生日おめでとう/ケーキを持つ;ただいま/ドアを開けて入る;おかえり/両手を広げて迎える;いってきます/元気に出発;いってらっしゃい/手を振る;寒いね/マフラーで震える;暑いね/うちわであおぐ;体調どう?/心配そうな顔;大丈夫?/そっとのぞきこむ;了解です/OKサイン;また連絡するね/スマホを持って手を振る;ごちそうさま/手を合わせる;いただきます/お箸を持って手を合わせる;休みの日どうする?/カレンダーを見る')},
+ couple:{n:'カップル',l:T('会いたい/クッションをぎゅっと抱く;大好き/ハートを抱える;おはよ/寝ぼけて手を振る;おやすみ/投げキッスでハートが飛ぶ;今なにしてる?/スマホをのぞきこむ;声聞きたい/電話を抱きしめる;ぎゅー/両手を広げる;すき/照れて顔を隠す;ありがと/ハートを渡す;ごめんね/しょんぼり上目づかい;楽しみ!/わくわく跳ねる;迎えに行くね/走ってくる;着いたよ/手を振る;待ってる/体育座りで待つ;寂しい/涙目でしゃがむ;会えてうれしい/ぴょんと跳ねる;今日もかわいい/指でハートを作る;がんばってね/ポンポンで応援;お疲れさま/肩をぽんぽん;了解だよ/ウインクでOK;照れる/ほっぺが真っ赤;ちゅー/唇をとがらせる;なでなで/頭をなでる;一緒に行こ/手を差し出す;どこ行く?/地図を広げる;ごはん行こ/お箸とお茶碗を持つ;電話していい?/電話を持ってもじもじ;おはようのハグ/両手を広げて駆け寄る;夢で会おうね/星の中で眠る;ずっと一緒/ハートの上に座る;記念日おめでとう/花束を持つ;ヤキモチ/ほっぺをふくらませる;ばか…/顔を赤くしてそっぽを向く;もう寝た?/そっとのぞく;起きてるよ/目をぱっちり開ける;見て見て/スマホを見せる;うれしすぎる/くるくる回る;今日はありがと/おじぎしてハート;また明日ね/手を振る;愛してる/大きなハートを掲げる')},
+ season:{n:'季節のイベント',l:T('あけましておめでとう/門松の前でおじぎ;今年もよろしく/鏡もちを持つ;お年玉ちょうだい/両手を差し出す;鬼は外!/豆をまく;ハッピーバレンタイン/チョコを渡す;お返しどうぞ/プレゼントを渡す;お花見しよう/桜の下でお団子;入学おめでとう/ランドセルを背負う;卒業おめでとう/卒業証書を持つ;こどもの日/こいのぼりを持つ;母の日ありがとう/カーネーションを渡す;父の日ありがとう/ネクタイを渡す;梅雨だね/傘をさす;七夕/短冊を飾る;夏休み!/浮き輪を持つ;暑中お見舞い/かき氷と風鈴;花火きれい/花火を見上げる;お盆休み/うちわで涼む;敬老の日ありがとう/肩たたき;お月見/お団子と満月;ハッピーハロウィン/かぼちゃをかぶる;トリックオアトリート/お菓子のかごを持つ;秋だね/落ち葉を持つ;食欲の秋/焼きいもを食べる;寒くなったね/マフラーを巻く;メリークリスマス/サンタ帽をかぶる;プレゼントありがとう/プレゼント箱を抱える;よいお年を/手を振る;大掃除がんばる/ほうきを持つ;年越しそば/そばを食べる;誕生日おめでとう/ケーキを持つ;雪だ!/雪だるまを作る;風邪ひかないでね/マスクを渡す;お疲れさま会/乾杯する;新年会しよう/おちょこを持つ;春だね/花を持つ;連休どこ行く?/旅行かばんを持つ;帰省するね/切符を見せる;おみやげ買ったよ/紙袋を渡す;また来年/手を振る')}
+};
+const TASTES={
+ yuru:{n:'ゆる手描き',s:'一定の太さの手描き線・省略多め',d:'線は一定の太さの黒い手描き線(少しゆらぎあり)。塗りはフラットな単色で影・グラデーションなし。目は単純な黒い丸のみ、口は小さな線。描き込みは最小限で、手足や体のパーツは省略気味。色数は少なめ(ただしキャラ本来の色は必ず残す)。'},
+ pop:{n:'太線ポップ',s:'太い黒線・はっきり色・集中線',d:'線は太くて均一な黒い輪郭線。塗りはキャラ本来の色を、はっきりした明るい色でフラットに塗り、影なし。目は黒い丸、ほっぺに赤み。キャラの周りに黄色の集中線やキラキラ、汗・ハートなどの記号を少しだけ入れて元気な印象にする。'},
+ line:{n:'シンプル線画',s:'細めの線・ほぼ白・1色だけ',d:'線は細め〜中くらいの一定の黒い線。塗りはフラットで影なし。色数は少なめ(ただしキャラ本来の色は必ず残す)。目は点、口は短い線。描き込みは最小限で余白を大事にする。'},
+ pastel:{n:'パステル',s:'やわらかい線・淡い色',d:'線はやわらかい濃い茶色の一定の線。塗りはキャラ本来の色をパステル調にしたフラット塗りで影なし。目は黒い丸、ほっぺに薄いピンク。全体にやさしい印象。'},
+ chibi:{n:'ちびキャラ',s:'2頭身・大きな頭',d:'体型は2頭身のデフォルメ(頭が大きく体は小さい)。線は一定の太さの黒い線。塗りはフラットで影なし。目は大きめの黒い丸(ハイライトなし)。'},
+ marker:{n:'マジック手描き',s:'太いペン風・ざっくり塗り',d:'線は太めのマジックペン風(少しかすれ)。塗りはざっくり、少しはみ出し気味で影なし。目は単純な黒い丸。手描きの味を残す。'}
+};
+const NG='リアルな描写、立体的な陰影、グラデーション、目の中のハイライトやキラキラ、細かい毛並み、背景の描き込みは入れない。指定していない帽子・リボン・蝶ネクタイ・服などの小物は付けない。';
+const PRESETS=[
+ {n:'白ねこ',nm:'しろねこ',theme:'全身が白、耳の内側とほっぺがピンク、しっぽは短めの、ぽっちゃりした白ねこ',taste:'yuru',tpl:'daily'},
+ {n:'しば犬',nm:'まゆげしばいぬ',theme:'頭と背中が茶色、口まわり・おなか・まゆげ模様が白、くるんと巻いたしっぽのしば犬',taste:'pop',tpl:'humor_daily'},
+ {n:'うさぎ',nm:'しろうさ',theme:'全身が白、長い耳の内側がピンク、まるい黒目の白うさぎ',taste:'pastel',tpl:'couple'},
+ {n:'ペンギン',nm:'まるペンギン',theme:'頭と背中が紺色、おなかと顔のまわりが白、くちばしと足がオレンジの、まんまるな体のペンギン',taste:'line',tpl:'daily'},
+ {n:'くま',nm:'ずんぐりくま',theme:'全身が茶色、鼻まわりとおなかが薄いベージュ、丸い耳のずんぐりしたくま',taste:'marker',tpl:'family'},
+ {n:'ハムスター',nm:'ほっぺハムスター',theme:'背中がオレンジがかった茶色、おなかと口まわりが白、ほっぺがふくらんだハムスター',taste:'chibi',tpl:'humor_daily'},
+ {n:'夫婦+ねこ',nm:'なかよし夫婦とねこ',theme:'仲良し夫婦(短い黒髪でグレーの服の夫と、黒髪おだんご頭でピンクの服の妻)と、しっぽの先だけ黒い白ねこ',taste:'pop',tpl:'humor_family'},
+ {n:'会社員',nm:'がんばる会社員',theme:'黒髪で、紺色のスーツに水色のネクタイをした会社員の男性',taste:'chibi',tpl:'humor_work'},
+ {n:'ひよこ',nm:'まんまるひよこ',theme:'全身が黄色、くちばしと足がオレンジの、まんまるなひよこ',taste:'chibi',tpl:'keigo'},
+ {n:'おばけ',nm:'ふわふわおばけ',theme:'全身が白でふわふわ、すそが波形、ほっぺがピンクのおばけ',taste:'line',tpl:'humor_daily'}];
+Object.assign(TPL,{
+ humor_family:{n:'ユーモア(家族・夫婦)',l:T('神対応!/ゴミ袋を両手に持ってドヤ顔/ゴミ出し;天才か!?/泡だらけのお皿を持って得意げ/皿洗い;優勝!/ブラシを掲げてガッツポーズ/お風呂掃除;えらすぎ!/洗濯かごを抱えてキラキラ/洗濯物;助かる〜!/買い物袋をいっぱい持つ/買い出し;今日も美味!/お茶碗を持ってにっこり/ごはん;晩ごはん何?/おなかを鳴らして首をかしげる;帰るコール/スマホを耳に当てて走る;家庭円満!/家族でぎゅっと集まる/本日も;緊急事態!/空っぽの冷蔵庫の前で青ざめる/冷蔵庫が;あと5分…/ふとんにくるまって抵抗;寝てた?/寝ぐせ頭で目をこする;ほめて!/胸を張って待つ;甘やかして/寝転がって両手を伸ばす;機嫌直して/お菓子を差し出してぺこぺこ;反省中…/正座してしょんぼり;既読です/スマホを見てうなずく;何か買う?/買い物かごを持って振り向く/ついでに;牛乳ない!/空の牛乳パックを振る;充電切れ/電池マークの上でぐったり;寝る!/まくらにダイブ/限界なので;最高かよ/両手を胸に当てて感動;お疲れさま!/肩をもむ/今日も;仲直り/小指を差し出す;お留守番中/窓からじっと外を見る;今どこ?/双眼鏡をのぞく;すぐ帰る!/全力ダッシュ;ちょい待ち/片手を前に出して止める;平和です/お茶をすすってほっこり/今日も;明日から/ケーキをほおばる/ダイエットは;財布が…/空っぽの財布を逆さにする;お風呂どうぞ/タオルを差し出す;ナイス!/親指を立ててウインク;ごめんて/手を合わせて片目をつぶる;大好物!/ごちそうに目を輝かせる;おかえり〜/玄関で両手を広げる;行ってら!/ハンカチを振る;感謝しかない/拝むように手を合わせる;今日もえらい/自分の頭をなでる')},
+ humor_daily:{n:'ユーモア(日常)',l:T('布団が離さない/ふとんに巻きつかれている;月曜つらい/机に突っ伏す;金曜最高!/くるくる踊る;寝坊した!/パンをくわえて走る;天才では?/メガネをくいっと上げる/私って;尊い…/胸を押さえて倒れる;それな/指をさしてうなずく;わかりみ/大きくうなずく;無理ぽ/とろけて床に広がる;エモい…/夕日を見て涙ぐむ;既読スルー…/スマホを見てしょんぼり;秒で行く!/ロケットで飛んでいく;優勝です/トロフィーを掲げる;気合い十分/ハチマキをしてこぶしを握る;神!/後光がさしている;ご褒美タイム/スイーツを抱える;ねむみ/まぶたが半分閉じている;腹ペコ/お皿とスプーンを持って待つ;光速で返信/スマホを高速で打つ;はて?/頭の上にはてなマーク;ドヤ/腕を組んでドヤ顔;ぴえん/うるうるの目;しんど…/床にばったり倒れる;癒やされたい/温泉につかる;天気よすぎ/太陽の下でのびをする;雨やだ〜/傘の下でしょんぼり;推しが尊い/ペンライトを振る;やる気どこ?/ソファの下をのぞいて探す;休憩しよ/お茶を飲んでひと息;まじか/目が点になる;あざす!/軽く手を上げてウインク;りょ!/敬礼;おけまる/両手で大きな丸;今起きた/寝ぐせ頭でぼーっと;筋肉痛/ぎこちなく歩く;帰りたい/窓の外を遠い目で見る;おやすみ〜/星空の下で眠る;楽しすぎ!/ジャンプしてはしゃぐ;また遊ぼ!/手を振ってスキップ;了解でーす/ゆるく敬礼')},
+ humor_work:{n:'ユーモア(仕事)',l:T('承知です!/ビシッと敬礼;会議なう/資料に埋もれる;定時です!/かばんを持ってダッシュ/本日;残業中…/パソコンの前でぐったり;確認中!/虫めがねで書類を見る/ただいま;神資料!/書類を掲げて拝む;助かります/深々とおじぎ;承知の助/腕を組んでうなずく;お先です!/手を振ってドアから出る;在宅勤務中/パジャマでパソコンに向かう;電車遅延…/満員電車でぎゅうぎゅう;休憩します/コーヒーを飲む;ランチ行く?/お弁当箱を持つ;がんばります/ねじりハチマキで腕まくり;異議なし!/元気に手を挙げる;ナイスです!/親指を立てる;恐縮です…/照れて頭をかく;お疲れさまです/お茶を差し出す;今向かってます/走っている;少々お待ちを/手のひらを出して止める;やり直しです/書類が舞い散る;締切ヤバい/時計を見て青ざめる;燃え尽きた…/真っ白になって座る;有給とります/スーツケースを持ってウキウキ;月曜こわい/ふとんの中で震える;給料日!/給料袋を掲げて喜ぶ;さすがです!/拍手する;了解しました/メモを取る;急ぎで!/メガホンで叫ぶ;あとでやる/書類を横に置いて昼寝;がんばった!/自分をぎゅっとハグ/今日も;飲みに行こ/ジョッキを掲げる;乾杯!/グラスを合わせる;寝不足です/目の下にクマ;リモートです/ヘッドセットで手を振る;持ち帰ります/書類を抱えてそそくさ;前向きに検討/遠くを見て考える;お任せあれ!/胸をどんとたたく;感謝感激!/涙を流して感動;良い週末を!/サングラスで手を振る')}
+});
+const TPL_ORDER=['daily','humor_daily','humor_family','humor_work','keigo','family','couple','season'];
+function tplPhrases(k){return TPL[k].l.map(([t,p,s])=>({t,p:p||'',s2:s?{t:s,pos:'tc',k:0.7}:null}))}
+const CHECKS=['スタンプのタイプは「スタンプ」を選んだ(あとから変えられない)','個数がZIPの中身と合っている','「AIの使用」で「AIを使用しています」を選んだ','AIとの会話(指示文の記録)は消さずに残している','販売開始は「手動」にして、承認後に自分でリリースする'];
+const META=[['titleJa','タイトル(日本語)',40,false],['descJa','説明文(日本語)',160,true],['titleEn','タイトル(英語)',40,false],['descEn','説明文(英語)',160,true],['creator','クリエイター名',50,false],['copyright','コピーライト(英数字のみ)',50,false]];
+const STEPS=['準備','下書きと文字','生成','手直し','確認','申請'];
+
+function defTxt(){return{font:'zenmaru',size:52,maxChars:8,color:'#1C2629',color2:'#1C2629',stroke:'white',pos:'bc',dir:'h',overlap:false}}
+function defaults(){return{v:2,id:newId(),name:'スタンプ1',step:1,visited:{},provider:'gemini',customName:'',customUrl:'',bg:'green',count:40,layout:'4x2',aspect:'auto',theme:'',style:'',userPrompt:'',ref:null,
+  textMode:'system',txt:defTxt(),tpl:'daily',taste:'yuru',phrases:tplPhrases('daily'),stickers:[],mainIdx:0,tabIdx:0,
+  meta:{titleJa:'',descJa:'',titleEn:'',descEn:'',creator:'',copyright:''},checks:[]}}
+function newId(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+let S=defaults();let INDEX=[];
+const RT=[];let refImg=null;let VER=0;const DIRTY=new Set();const ISS=[];let UNDO=[];
+
+/* ---------- storage ---------- */
+const DB={db:null,
+  open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{let r;try{r=indexedDB.open('stamp-kobo',1)}catch(e){rej(e);return}r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{this.db=r.result;res(this.db)};r.onerror=()=>rej(r.error)})},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv').objectStore('kv').get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error)})},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})},
+  async del(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}};
+let saveT;
+function save(){clearTimeout(saveT);saveT=setTimeout(saveNow,600)}
+async function saveNow(){try{const snap=JSON.parse(JSON.stringify(Object.assign({},S,{stickers:S.stickers.map(st=>st?Object.assign({},st,{src:undefined,orig:undefined,ext:1}):null)})));for(const i of [...DIRTY]){const st=S.stickers[i];if(st&&st.src)await DB.set(`img:${S.id}:${i}`,{src:st.src,orig:st.orig});DIRTY.delete(i)}await DB.set('p:'+S.id,snap);const e=INDEX.find(x=>x.id===S.id);if(e){e.name=S.name;e.updated=Date.now()}else INDEX.push({id:S.id,name:S.name,updated:Date.now()});await DB.set('index',INDEX);await DB.set('cur',S.id)}catch(e){}}
+function migrate(s){
+  const d=defaults();const o=Object.assign(d,s||{});o.meta=Object.assign(defaults().meta,(s&&s.meta)||{});o.txt=Object.assign(defTxt(),(s&&s.txt)||{});o.visited=o.visited||{};
+  if(!s||s.v!==2){o.v=2;const had=(o.stickers||[]).some(x=>x);if(had)o.textMode='ai';o.name=o.name||'スタンプ1';
+    (o.stickers||[]).forEach((st,i)=>{if(!st)return;if(st.text&&o.phrases[i]&&!o.phrases[i].t)o.phrases[i].t=st.text;delete st.text;delete st.tcolor;delete st.tsize;delete st.tpos;st.ts=null})}
+  if(o.bg==='clear')o.bg='green';if(!TASTES[o.taste])o.taste='yuru';o.sheetSaved=o.sheetSaved||{};
+  if(!o.id)o.id=newId();while(o.phrases.length<o.count)o.phrases.push({t:'',p:''});return o;
+}
+async function loadState(s){
+  S=migrate(s);RT.length=0;refImg=null;
+  DIRTY.clear();ISS.length=0;
+  for(let i=0;i<S.stickers.length;i++){const st=S.stickers[i];if(!st)continue;try{if(!st.src){const im=await DB.get(`img:${S.id}:${i}`);if(!im)throw 0;st.src=im.src;st.orig=im.orig}else DIRTY.add(i);delete st.ext;RT[i]={cv:imgToCanvas(await loadImg(st.src)),ver:++VER}}catch(e){S.stickers[i]=null}}
+  if(S.ref){try{refImg=await loadImg(S.ref)}catch(e){S.ref=null}}
+  await ensureFonts();
+}
+
+/* ---------- helpers ---------- */
+function mk(w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));return c}
+function ctx(c){return c.getContext('2d',{willReadFrequently:true})}
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('画像を読み込めませんでした'));i.src=src})}
+async function fileToCanvas(f,maxDim){const u=URL.createObjectURL(f);try{return imgToCanvas(await loadImg(u),maxDim)}finally{URL.revokeObjectURL(u)}}
+function imgToCanvas(img,maxDim){const w0=img.naturalWidth||img.width,h0=img.naturalHeight||img.height;const k=maxDim?Math.min(1,maxDim/Math.max(w0,h0)):1;const c=mk(w0*k,h0*k);const x=ctx(c);x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);return c}
+function crop(src,x,y,w,h){const c=mk(w,h);ctx(c).drawImage(src,x,y,w,h,0,0,w,h);return c}
+function toast(t,ms=2600){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,ms)}
+function afterFill(){if(filled()===S.count&&!S.bkNotified){S.bkNotified=true;save();setTimeout(()=>toast(`${S.count}個そろいました!念のため、STEP 1の「バックアップを保存」で保存しておきましょう`,7000),2700)}}
+function cloneCv(c){const n=mk(c.width,c.height);ctx(n).drawImage(c,0,0);return n}
+function busy(on,t){$('#busy').hidden=!on;if(t)$('#busyText').textContent=t}
+const tick=()=>new Promise(r=>setTimeout(r,16));
+const pad=n=>String(n).padStart(2,'0');
+function per(){const [c,r]=S.layout.split('x').map(Number);return {cols:c,rows:r,n:c*r}}
+function sheetCount(){return Math.ceil(S.count/per().n)}
+function aiName(){return S.provider==='other'?(S.customName||'AI'):PROVIDERS[S.provider].name}
+function aiUrl(){return S.provider==='other'?(S.customUrl||''):PROVIDERS[S.provider].url}
+function has(i){return !!(S.stickers[i]&&RT[i])}
+function filled(){let n=0;for(let i=0;i<S.count;i++)if(has(i))n++;return n}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function copyText(t){
+  const fallback=()=>{const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();toast(ok?'コピーしました':'コピーできませんでした。「指示文を見る」から長押しで選択してください')};
+  try{navigator.clipboard.writeText(t).then(()=>toast('コピーしました'),fallback)}catch(e){fallback()}
+}
+function fontOf(k){return FONTS.find(f=>f.k===k)||FONTS[0]}
+function fontStr(ts,fs){const f=fontOf(ts.font);return `${f.w} ${fs}px "${f.f}","Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif`}
+async function ensureFonts(){
+  if(!document.fonts)return;const keys=new Set([S.txt.font]);S.stickers.forEach(s=>s&&s.ts&&keys.add(s.ts.font));
+  const txt=[...new Set(S.phrases.map(p=>(p.t||'')+(p.s2?p.s2.t:'')).join('')+'あ')].join('');
+  await Promise.all([...keys].map(k=>{const f=fontOf(k);return document.fonts.load(`${f.w} 40px "${f.f}"`,txt).catch(()=>{})}));
+}
+
+/* ---------- background removal ---------- */
+function removeBg(src,tol,forceGlobal){
+  const w=src.width,h=src.height,c=mk(w,h),x=ctx(c);x.drawImage(src,0,0);
+  const id=x.getImageData(0,0,w,h),d=id.data,N=w*h;
+  let trans=0,tot=0;const bk=new Map();
+  const sample=i=>{tot++;const o=i*4;if(d[o+3]<16){trans++;return}const r=d[o],g=d[o+1],b=d[o+2];const k=(r>>4)<<8|(g>>4)<<4|(b>>4);let e=bk.get(k);if(!e){e=[0,0,0,0];bk.set(k,e)}e[0]++;e[1]+=r;e[2]+=g;e[3]+=b};
+  for(let X=0;X<w;X++){sample(X);sample((h-1)*w+X)}for(let Y=1;Y<h-1;Y++){sample(Y*w);sample(Y*w+w-1)}
+  if(trans/tot>0.5)return c;
+  const op=tot-trans;
+  const cols=[...bk.values()].sort((a,b)=>b[0]-a[0]).filter(e=>e[0]>=op*0.06).slice(0,4).map(e=>[e[1]/e[0],e[2]/e[0],e[3]/e[0]]);
+  if(!cols.length)return c;
+  const t2=tol*tol;
+  const dist2=i=>{const o=i*4,r=d[o],g=d[o+1],b=d[o+2];let m=1e9;for(const q of cols){const a=r-q[0],e=g-q[1],f=b-q[2];const s=a*a+e*e+f*f;if(s<m)m=s}return m};
+  const bg=new Uint8Array(N),q=new Int32Array(N);let qh=0,qt=0;
+  const push=i=>{if(bg[i])return;if(d[i*4+3]<16||dist2(i)<=t2){bg[i]=1;q[qt++]=i}};
+  for(let X=0;X<w;X++){push(X);push((h-1)*w+X)}for(let Y=0;Y<h;Y++){push(Y*w);push(Y*w+w-1)}
+  while(qh<qt){const i=q[qh++],X=i%w;if(X>0)push(i-1);if(X<w-1)push(i+1);if(i>=w)push(i-w);if(i<N-w)push(i+w)}
+  const chroma=cols.some(v=>Math.max(...v)-Math.min(...v)>90);
+  if(chroma||forceGlobal){const lim=chroma?t2:t2*0.6;for(let i=0;i<N;i++)if(!bg[i]&&dist2(i)<=lim)bg[i]=1}
+  const green=cols.some(v=>v[1]>v[0]+60&&v[1]>v[2]+60);
+  for(let i=0;i<N;i++)if(bg[i])d[i*4+3]=0;
+  for(let i=0;i<N;i++){
+    if(bg[i])continue;const X=i%w;
+    const nb=(X>0&&bg[i-1])||(X<w-1&&bg[i+1])||(i>=w&&bg[i-w])||(i<N-w&&bg[i+w]);const o=i*4;
+    if(nb){const s=Math.sqrt(dist2(i));if(s<tol*2)d[o+3]=Math.min(d[o+3],Math.round(255*Math.max(0,(s-tol)/tol)))}
+    if(green){const r=d[o],g=d[o+1],b=d[o+2],mx=Math.max(r,b);if(g>mx+30&&(nb||dist2(i)<t2*6))d[o+1]=mx}
+  }
+  x.putImageData(id,0,0);return c;
+}
+function profile(d,w,x0,x1,y0,y1,horiz){const out=new Uint32Array(horiz?(y1-y0):(x1-x0));for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)if(d[(y*w+x)*4+3]>24){if(horiz)out[y-y0]++;else out[x-x0]++}return out}
+function cuts(pr,n){const L=pr.length,res=[0];for(let k=1;k<n;k++){const e=Math.round(L*k/n),win=Math.round(L/n*0.35);let best=e,bv=Infinity;for(let p=Math.max(1,e-win);p<=Math.min(L-2,e+win);p++){const v=pr[p]*100000+Math.abs(p-e);if(v<bv){bv=v;best=p}}res.push(best)}res.push(L);return res}
+function autoCuts(proc,cols,rows){const w=proc.width,h=proc.height,d=ctx(proc).getImageData(0,0,w,h).data;const rc=cuts(profile(d,w,0,w,0,h,true),rows);const ccs=[];for(let r=0;r<rows;r++)ccs.push(cuts(profile(d,w,0,w,rc[r],rc[r+1],false),cols));return{rc,ccs}}
+function cellsFrom(proc,raw,cu,cols,rows){const cells=[];for(let r=0;r<rows;r++){const y0=cu.rc[r],hh=Math.max(1,cu.rc[r+1]-y0);for(let c=0;c<cols;c++){const x0=cu.ccs[r][c],ww=Math.max(1,cu.ccs[r][c+1]-x0);cells.push({raw:crop(raw,x0,y0,ww,hh),proc:crop(proc,x0,y0,ww,hh)})}}return cells}
+function splitSheet(proc,raw,cols,rows){return cellsFrom(proc,raw,autoCuts(proc,cols,rows),cols,rows)}
+function cleanTrim(c){
+  const w=c.width,h=c.height,x=ctx(c),id=x.getImageData(0,0,w,h),d=id.data,N=w*h;
+  const lab=new Int32Array(N),q=new Int32Array(N);let L=0;const areas=[0];
+  for(let s=0;s<N;s++){if(lab[s]||d[s*4+3]<=24)continue;L++;let qh=0,qt=0;q[qt++]=s;lab[s]=L;let a=0;
+    while(qh<qt){const i=q[qh++];a++;const X=i%w;const nb=[X>0?i-1:-1,X<w-1?i+1:-1,i-w,i+w];for(const j of nb){if(j<0||j>=N||lab[j]||d[j*4+3]<=24)continue;lab[j]=L;q[qt++]=j}}
+    areas.push(a)}
+  const minA=Math.max(10,N*0.00025);let x0=w,y0=h,x1=-1,y1=-1;
+  for(let i=0;i<N;i++){const l=lab[i];if(l&&areas[l]<minA){d[i*4+3]=0;continue}if(d[i*4+3]>8){const X=i%w,Y=(i/w)|0;if(X<x0)x0=X;if(X>x1)x1=X;if(Y<y0)y0=Y;if(Y>y1)y1=Y}}
+  if(x1<0||(x1-x0+1)*(y1-y0+1)<N*0.01)return null;
+  x.putImageData(id,0,0);const p=2;x0=Math.max(0,x0-p);y0=Math.max(0,y0-p);x1=Math.min(w-1,x1+p);y1=Math.min(h-1,y1+p);
+  let out=crop(c,x0,y0,x1-x0+1,y1-y0+1);const mx=900;
+  if(Math.max(out.width,out.height)>mx){const k=mx/Math.max(out.width,out.height);const o2=mk(out.width*k,out.height*k);const x2=ctx(o2);x2.imageSmoothingQuality='high';x2.drawImage(out,0,0,o2.width,o2.height);out=o2}
+  return out;
+}
+function newSticker(i,rawC,procC){const old=S.stickers[i];S.stickers[i]={src:procC.toDataURL('image/png'),orig:rawC.toDataURL('image/png'),scale:1,dx:0,dy:0,tol:60,global:false,ts:old?old.ts:null};RT[i]={cv:procC,ver:++VER};DIRTY.add(i)}
+
+/* ---------- text + render ---------- */
+const ROT=new Set([...'ー〜～…‥—―-−~()()<>=']);const SMALL=new Set([...'ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ']);const PUNCT=new Set([...'、。,.']);const VMAP={'「':'﹁','」':'﹂','『':'﹃','』':'﹄'};
+function txtStyle(i){const st=S.stickers[i];return(st&&st.ts)?st.ts:S.txt}
+function textOn(i){const st=S.stickers[i];return S.textMode==='system'||!!(st&&st.ts&&st.ts.force)}
+const SWK=0.14;
+const swkOf=ts=>ts.stroke==='none'?0:ts.stroke==='double'?SWK*2.2:SWK;
+function maxN(){return S.txt.maxChars||8}
+function baseFs(ts,w,h,m){const k=h/320;const swk=swkOf(ts);const N=ts.maxChars||maxN();
+  if(ts.dir==='v')return Math.min(90*k,(h-2*m)/(N*1.04+swk));
+  const x=ctx(mk(4,4));x.font=fontStr(ts,100);const per=x.measureText('あ'.repeat(N)).width/100;return Math.min(90*k,(w-2*m)/(per+swk))}
+function layoutText(x,text,ts,w,h,m,scale=1){
+  let fs=baseFs(ts,w,h,m)*scale;const swk=swkOf(ts);const chars=[...text];
+  if(ts.dir==='v'){const maxH=h-2*m;const th=chars.length*fs*1.04+fs*swk;if(th>maxH)fs*=maxH/th;return{fs,tw:fs*(1.1+swk),th:chars.length*fs*1.04+fs*swk}}
+  x.font=fontStr(ts,fs);let tw=x.measureText(text).width+fs*swk;const maxW=w-2*m;if(tw>maxW){fs*=maxW/tw;x.font=fontStr(ts,fs);tw=x.measureText(text).width+fs*swk}
+  return{fs,tw,th:fs*(1.2+swk)};
+}
+function layoutFor(i,w,h,m,withText){
+  const ph=S.phrases[i]||{};const text=ph.t||'';const ts=txtStyle(i);const on=withText&&textOn(i);
+  const show=on&&!!text;const sub=ph.s2&&ph.s2.t?ph.s2:null;const show2=on&&!!sub;
+  let x0=m,y0=m,x1=w-m,y1=h-m,L=null,L2=null;const x=ctx(mk(4,4));
+  const res=(L,pos)=>{if(ts.overlap)return;const [c,r]=POS[pos]||POS.bc;
+    if(ts.dir==='h'){if(r===0)y0=Math.max(y0,m+L.th);else if(r===2)y1=Math.min(y1,h-m-L.th);else if(c===0)x0=Math.max(x0,m+L.tw);else if(c===2)x1=Math.min(x1,w-m-L.tw)}
+    else{if(c===0)x0=Math.max(x0,m+L.tw);else if(c===2)x1=Math.min(x1,w-m-L.tw);else if(r===0)y0=Math.max(y0,m+L.th*0.5);else if(r===2)y1=Math.min(y1,h-m-L.th*0.5)}};
+  if(show){L=layoutText(x,text,ts,w,h,m);res(L,ts.pos)}
+  if(show2){L2=layoutText(x,sub.t,ts,w,h,m,sub.k||0.7);res(L2,sub.pos||'tr')}
+  return{text,show,ts,L,sub,show2,L2,rect:{x:x0,y:y0,w:Math.max(20,x1-x0),h:Math.max(20,y1-y0)}};
+}
+function imgGeom(src,st,rect,w,h){const sw=src.naturalWidth||src.width,sh=src.naturalHeight||src.height;const s=Math.min(rect.w/sw,rect.h/sh)*(st?st.scale:0.85);const dw=sw*s,dh=sh*s;return{s,dw,dh,px:rect.x+(rect.w-dw)/2+(st?st.dx:0)*w,py:rect.y+(rect.h-dh)/2+(st?st.dy:0)*h}}
+function drawText(x,text,ts,L,pos,w,h,m,color){
+  const [c,r]=POS[pos]||POS.bc;const cx=c===0?m+L.tw/2:c===2?w-m-L.tw/2:w/2;const cy=r===0?m+L.th/2:r===2?h-m-L.th/2:h/2;
+  x.font=fontStr(ts,L.fs);x.lineJoin='round';x.textAlign='center';x.textBaseline='middle';
+  const sw=ts.stroke==='none'?0:L.fs*SWK;const sc=ts.stroke==='black'?'#1C2629':'#FFFFFF';const dbl=ts.stroke==='double';const fc=color||ts.color;
+  const items=[];
+  if(ts.dir==='h')items.push([text,cx,cy,false]);
+  else{const chars=[...text];const step=L.fs*1.04;let y=cy-(chars.length*step)/2+step/2;
+    for(const ch0 of chars){let ch=VMAP[ch0]||ch0,dx=0,dy=0,rot=false;if(ROT.has(ch0))rot=true;else if(SMALL.has(ch0)){dx=L.fs*0.12;dy=-L.fs*0.12}else if(PUNCT.has(ch0)){dx=L.fs*0.55;dy=-L.fs*0.5}items.push([ch,cx+dx,y+dy,rot]);y+=step}}
+  const put=(it,mode)=>{x.save();x.translate(it[1],it[2]);if(it[3])x.rotate(Math.PI/2);if(mode==='o'){x.lineWidth=sw*2.2;x.strokeStyle='#1C2629';x.strokeText(it[0],0,0)}else if(mode==='s'){x.lineWidth=dbl?sw*1.6:sw;x.strokeStyle=sc;x.strokeText(it[0],0,0)}else{x.fillStyle=fc;x.fillText(it[0],0,0)}x.restore()};
+  if(dbl)items.forEach(it=>put(it,'o'));if(sw)items.forEach(it=>put(it,'s'));items.forEach(it=>put(it,'f'));
+}
+function renderSt(i,w=W,h=H,m=M,withText=true,ghost=false){
+  const c=mk(w,h),x=ctx(c);const st=S.stickers[i];const ok=has(i);const lay=layoutFor(i,w,h,m,withText);
+  const src=ok?RT[i].cv:(ghost&&refImg?refImg:null);
+  if(src){const g=imgGeom(src,ok?st:null,lay.rect,w,h);x.globalAlpha=ok?1:0.3;x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(src,g.px,g.py,g.dw,g.dh);x.globalAlpha=1}
+  else if(ghost){const r=lay.rect;x.save();x.setLineDash([10,8]);x.strokeStyle='rgba(120,130,135,.55)';x.lineWidth=3;x.strokeRect(r.x+12,r.y+12,r.w-24,r.h-24);x.fillStyle='rgba(120,130,135,.6)';x.font='700 22px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(S.phrases[i]?.p||'絵',r.x+r.w/2,r.y+r.h/2,r.w-40);x.restore()}
+  if(lay.show)drawText(x,lay.text,lay.ts,lay.L,lay.ts.pos,w,h,m);
+  if(lay.show2)drawText(x,lay.sub.t,lay.ts,lay.L2,lay.sub.pos||'tr',w,h,m,lay.ts.color2||lay.ts.color);
+  return c;
+}
+function marginBad(c,m=M){const w=c.width,h=c.height,d=ctx(c).getImageData(0,0,w,h).data;for(let y=0;y<h;y++){const ey=y<m||y>=h-m;for(let x=0;x<w;x++){if(!ey&&x>=m&&x<w-m){x=w-m-1;continue}if(d[(y*w+x)*4+3]>16)return true}}return false}
+function stats(c){const w=c.width,h=c.height,d=ctx(c).getImageData(0,0,w,h).data;let x0=w,y0=h,x1=-1,y1=-1,op=0;for(let i=0;i<w*h;i++){if(d[i*4+3]>16){op++;const X=i%w,Y=(i/w)|0;if(X<x0)x0=X;if(X>x1)x1=X;if(Y<y0)y0=Y;if(Y>y1)y1=Y}}const bb=x1<0?0:(x1-x0+1)*(y1-y0+1);return{fill:bb?op/bb:0,cover:bb/(w*h)}}
+function sigOf(i){const st=S.stickers[i];return [RT[i]&&RT[i].ver,st.scale,st.dx,st.dy,JSON.stringify(txtStyle(i)),S.textMode,JSON.stringify(S.phrases[i]||{}),maxN()].join('|')}
+function issues(i){if(!has(i))return['未作成'];const sg=sigOf(i);const c=ISS[i];if(c&&c.sg===sg)return c.r;const r=issuesRaw(i);ISS[i]={sg,r};return r}
+function issuesRaw(i){const out=[];const c=renderSt(i);if(marginBad(c))out.push('余白');const s=stats(c);if(s.fill>0.93&&s.cover>0.5)out.push('背景');if(s.cover<0.2)out.push('小さい');const lay=layoutFor(i,W,H,M,true);if(lay.show&&lay.L.fs<26)out.push('文字小');if(overLen(i))out.push('文字数');return out}
+function overLen(i){const ph=S.phrases[i]||{};const n=maxN();return [...(ph.t||'')].length>n||(ph.s2&&[...(ph.s2.t||'')].length>n)}
+function dupSets(){const tc={},pc={};S.phrases.slice(0,S.count).forEach(p=>{const t=(p.t||'').trim(),q=(p.p||'').trim();if(t)tc[t]=(tc[t]||0)+1;if(q)pc[q]=(pc[q]||0)+1});return{t:new Set(Object.keys(tc).filter(k=>tc[k]>1)),p:new Set(Object.keys(pc).filter(k=>pc[k]>1))}}
+
+/* ---------- prompts ---------- */
+const AR={'4x2':'16:9','2x2':'1:1','1x1':'4:3'};const ARN={'16:9':'16:9(横長)','3:2':'3:2(やや横長)','4:3':'4:3(少し横長)','1:1':'1:1(正方形)'};
+function arText(){return ARN[S.aspect==='auto'?AR[S.layout]:S.aspect]}
+function charLine(){return `キャラ:${S.theme||'オリジナルのかわいいキャラクター'}`}
+function tasteBlock(){const t=TASTES[S.taste]||TASTES.yuru;return `【最優先】キャラの見た目(色・形・特徴)は【キャラ】の説明${S.ref?'と添付画像':''}を最優先する。絵柄の指定とぶつかる場合も、キャラらしさを守る。\n【絵柄】${t.d}${S.style?` 追加:${S.style}`:''}\n【禁止】${NG}`}
+function extra(){return S.userPrompt?`\n【追加の指定】${S.userPrompt}`:''}
+function who(){return S.ref?'添付した画像のキャラクターと同じキャラで、':'これまでと同じキャラクターで、'}
+function textRule(){
+  if(S.textMode==='ai')return'【文字】セリフはイラストの近くに大きく読みやすく入れる。文字にも輪郭を付ける。';
+  const t=S.txt;let space='';if(!t.overlap){const [c,r]=POS[t.pos]||POS.bc;const side=t.dir==='h'?(r===0?'上':r===2?'下':c===0?'左':c===2?'右':''):(c===0?'左':c===2?'右':'');if(side)space=`各イラストの${side}側に、あとで文字を入れるすき間を少し空ける。`}
+  return `【文字】文字・セリフ・吹き出しは一切描かない(文字はあとで入れます)。${space}`;
+}
+function itemLine(i,num){const ph=S.phrases[i]||{t:'',p:''};return S.textMode==='ai'?`${num}. ${ph.t?`「${ph.t}」`:'(文字なし)'} ${ph.p||''}`.trim():`${num}. 気持ち:${ph.t||'自由'}/ポーズ:${ph.p||'自由'}`}
+function charPrompt(){return `LINEスタンプ用のオリジナルキャラクターの見本を1体だけ描いてください。\n【画像の縦横比】1:1(正方形)\n【${charLine()}】\n${tasteBlock()}\n正面向きの全身、にっこり笑顔。文字は入れない。\n【背景】${BGTXT[S.bg]}${extra()}`}
+function sheetPrompt(k){
+  const p=per(),from=k*p.n,to=Math.min(S.count,from+p.n),items=[];for(let i=from;i<to;i++)items.push(itemLine(i,i-from+1));
+  const n=to-from;const lay=n===1?'1枚の画像の中央に1体だけ描く。周りに余白を残す。':`横${p.cols}列×縦${p.rows}行の等間隔のマス目に1体ずつ、左上から右へ順番に並べる。マスの境目に線は引かない。各イラストはマスの中央に少し小さめに収め、となりのイラストと十分すき間を空ける(重ならない・はみ出さない)。`;
+  const prev=[];for(let i=0;i<from;i++){const q=S.phrases[i]?.p;if(q)prev.push(q)}
+  const vary=n>1?`\n【バリエーション】${n}体すべて違うポーズ・表情・体の向きにする。同じ構図をくり返さない。`:'';
+  const avoid=prev.length?`\n【前の回とかぶらないように】前の回で次のポーズを描いたので、同じ構図・同じ動きにしない:${prev.join('、')}`:'';
+  return `${who()}LINEスタンプ用のイラストを${n}個、1枚の画像にまとめて描いてください。\n\n【画像の縦横比】${arText()}\n【配置】${lay}\n【背景】${BGTXT[S.bg]}\n【${charLine()}】どのイラストも同じキャラ・同じ絵柄にする。\n${tasteBlock()}\n${textRule()}${vary}${avoid}${extra()}\n\n【中身】\n${items.join('\n')}`;
+}
+function fixPrompt(i){
+  const note=$('#edNote').value.trim();const others=S.phrases.slice(0,S.count).map((p,j)=>j!==i&&p.p?p.p:null).filter(Boolean).slice(0,40);
+  return `${who()}LINEスタンプ用のイラスト${has(i)?'を1体だけ作り直して':'を1体だけ描いて'}ください。\n【画像の縦横比】4:3(少し横長)\n【中身】${itemLine(i,1).replace(/^1\. /,'')}\n${note?`【直してほしい所】${note}\n`:''}【${charLine()}】\n${tasteBlock()}\n${textRule()}\n【配置】1枚の画像の中央に1体だけ。周りに余白を残す。\n【背景】${BGTXT[S.bg]}${others.length?`\n【かぶらないように】ほかのスタンプのポーズ(${others.join('、')})とは違う構図にする。`:''}${extra()}`;
+}
+
+/* ---------- text controls ---------- */
+function buildTc(root,getTs,onChange,sample,opts={}){
+  const ts=getTs();root.innerHTML='';root.className='tc';
+  const sec=(label)=>{const d=document.createElement('div');d.style.display='grid';d.style.gap='8px';const l=document.createElement('span');l.className='lab';l.textContent=label;d.appendChild(l);root.appendChild(d);return d};
+  const fd=sec('フォント(タップで選ぶ)');const fg=document.createElement('div');fg.className='fonts';
+  FONTS.forEach(f=>{const b=document.createElement('button');b.type='button';b.className='fontopt';b.setAttribute('aria-pressed',String(f.k===ts.font));b.innerHTML=`<span class="fs"></span><span class="fn"></span>`;const s=b.querySelector('.fs');s.style.fontFamily=`"${f.f}",sans-serif`;s.style.fontWeight=f.w;s.textContent=sample||'おはよう';b.querySelector('.fn').textContent=f.n;b.onclick=()=>onChange({font:f.k},true);fg.appendChild(b)});fd.appendChild(fg);
+  const pd=sec('文字の位置');const pg=document.createElement('div');pg.className='posgrid';POSL.forEach(([k,n])=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.setAttribute('aria-pressed',String(ts.pos===k));b.onclick=()=>onChange({pos:k},true);pg.appendChild(b)});pd.appendChild(pg);
+  const dd=sec('書き方');const sg=document.createElement('div');sg.className='seg';[['h','横書き'],['v','縦書き']].forEach(([k,n])=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.setAttribute('aria-pressed',String(ts.dir===k));b.onclick=()=>onChange({dir:k},true);sg.appendChild(b)});dd.appendChild(sg);
+  if(!opts.editor){const zd=sec('1か所の最大文字数(この文字数がちょうど収まる大きさに、全部の文字をそろえます)');const sel=document.createElement('select');sel.setAttribute('aria-label','最大文字数');sel.style.maxWidth='220px';sel.innerHTML=[5,6,7,8,9,10].map(n=>`<option value="${n}">${n}文字</option>`).join('');sel.value=String(ts.maxChars||8);sel.onchange=()=>onChange({maxChars:Number(sel.value)},true);zd.appendChild(sel)}
+  const cd=sec('文字の色');const sw=document.createElement('div');sw.className='swatches';COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.setAttribute('aria-label','色 '+c);b.setAttribute('aria-pressed',String(ts.color===c));b.onclick=()=>onChange({color:c},true);sw.appendChild(b)});cd.appendChild(sw);
+  const cd2=sec('2か所目(前置き)の文字の色');const sw2=document.createElement('div');sw2.className='swatches';COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.setAttribute('aria-label','2か所目の色 '+c);b.setAttribute('aria-pressed',String((ts.color2||ts.color)===c));b.onclick=()=>onChange({color2:c},true);sw2.appendChild(b)});cd2.appendChild(sw2);
+  const od=sec('文字のフチ');const og=document.createElement('div');og.className='seg';[['white','白フチ'],['black','黒フチ'],['double','二重フチ(強調)'],['none','フチなし']].forEach(([k,n])=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.setAttribute('aria-pressed',String(ts.stroke===k));b.onclick=()=>onChange({stroke:k},true);og.appendChild(b)});od.appendChild(og);
+  const ld=document.createElement('div');ld.className='checks';ld.innerHTML='<label><input type="checkbox">絵と文字を重ねる(オフだと文字の分だけ絵を小さくします)</label>';const cb=ld.querySelector('input');cb.checked=!!ts.overlap;cb.onchange=()=>onChange({overlap:cb.checked},true);root.appendChild(ld);
+}
+
+/* ---------- rail / nav ---------- */
+function nextAction(){
+  const f=filled();
+  if(!S.theme)return[1,'STEP 1:キャラ・テーマを入力しましょう'];
+  if(!S.visited[2])return[2,'STEP 2:セリフ・ポーズと文字のデザインを決めましょう'];
+  if(f<S.count){const p=per();for(let k=0;k<sheetCount();k++){const from=k*p.n,to=Math.min(S.count,from+p.n);for(let i=from;i<to;i++)if(!has(i))return[3,`STEP 3:${sheetCount()>1?`${k+1}回目(${pad(from+1)}〜${pad(to)}番)`:'画像'}をAIで作って読み込みましょう`]}}
+  let bad=0;for(let i=0;i<S.count;i++){const is=issues(i);if(is.length)bad++}
+  if(bad)return[4,`STEP 4:直したほうがよいスタンプが${bad}個あります`];
+  if(!S.visited[5])return[5,'STEP 5:完成プレビューで見え方を確認しましょう'];
+  if(!S.meta.titleJa||!S.meta.descJa||!S.meta.titleEn||!S.meta.descEn)return[6,'STEP 6:タイトルと説明文(日本語・英語)を入れましょう'];
+  return[6,'準備完了!ZIPを保存して申請しましょう'];
+}
+function renderRail(){
+  const f=filled();const cnt={3:`${f}/${S.count}`,4:`${f}/${S.count}`};
+  const done={1:!!S.theme,2:!!S.visited[2],3:f===S.count,4:f===S.count&&S.visited[4],5:!!S.visited[5]};
+  $('#rail').innerHTML=STEPS.map((t,k)=>{const n=k+1;const d=done[n]&&S.step!==n;return `<button type="button" data-go="${n}" ${S.step===n?'aria-current="step"':''} class="${d?'done':''}"><span class="n">${d?'✓':n}</span>${t}${cnt[n]?`<span class="c">${cnt[n]}</span>`:''}</button>`}).join('');
+  const [ns,nt]=nextAction();$('#nextText').textContent=nt;$('#nextGo').hidden=ns===S.step;$('#nextGo').dataset.go=ns;
+  $('#hdrSub').textContent=`セット:${S.name}`;
+}
+function go(n){S.step=n;S.visited[n]=true;save();$$('section.step').forEach(s=>s.hidden=Number(s.dataset.step)!==n);renderStep(n);renderRail();
+  const cur=$('#rail [aria-current="step"]');if(cur)cur.scrollIntoView({block:'nearest',inline:'center'});window.scrollTo({top:0})}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b&&!b.hidden){showView('make');go(Number(b.dataset.go))}});
+function renderStep(n){if(n===1)renderSetup();if(n===2)renderDraft();if(n===3)renderSheets();if(n===4)renderFix();if(n===5)renderCheck();if(n===6)renderApply()}
+function updateAiLinks(){$$('[data-ai-link]').forEach(a=>{const u=aiUrl();a.textContent=`${aiName()}を開く ↗`;if(u){a.href=u;a.removeAttribute('aria-disabled')}else{a.removeAttribute('href');a.setAttribute('aria-disabled','true')}})}
+function showView(v){$('#makeView').hidden=v!=='make';$('#guideView').hidden=v!=='guide';$('#viewMake').setAttribute('aria-pressed',String(v==='make'));$('#viewGuide').setAttribute('aria-pressed',String(v==='guide'));if(v==='guide'){drawGuide();window.scrollTo({top:0})}}
+$('#viewMake').onclick=()=>showView('make');$('#viewGuide').onclick=()=>showView('guide');$('#guideBack').onclick=()=>{showView('make');window.scrollTo({top:0})};
+
+/* ---------- step 1 ---------- */
+function renderSetup(){
+  $$('input[name=prov]').forEach(r=>r.checked=r.value===S.provider);
+  $('#customAi').hidden=S.provider!=='other';$('#customName').value=S.customName;$('#customUrl').value=S.customUrl;$('#provNote').textContent=PROVIDERS[S.provider].note;
+  renderTaste();$('#presets').innerHTML=PRESETS.map((p,i)=>`<button type="button" data-preset="${i}" aria-pressed="${S.theme===p.theme}"><b>${p.n}</b><span>${TASTES[p.taste].n}・${TPL[p.tpl].n}</span></button>`).join('');
+  $('#theme').value=S.theme;$('#charName').value=S.charName||'';$('#style').value=S.style;themeHint();$('#userPrompt').value=S.userPrompt;
+  $('#count').value=String(S.count);$('#layout').value=S.layout;$('#aspect').value=S.aspect;$('#bg').value=S.bg;
+  $('#projSel').innerHTML=INDEX.slice().sort((a,b)=>b.updated-a.updated).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('#projSel').value=S.id;$('#projName').value=S.name;
+  renderRef();updateAiLinks();
+}
+function themeHint(){const t=S.theme||'';$('#themeHint').hidden=!t||([...t].length>=14&&/色|白|黒|茶|赤|青|黄|緑|ピンク|オレンジ|グレー|紺|ベージュ/.test(t))}
+function renderTaste(){$('#tasteOpts').innerHTML=Object.entries(TASTES).map(([k,t])=>`<label class="opt"><input type="radio" name="taste" value="${k}" ${S.taste===k?'checked':''}><b>${t.n}</b><span>${t.s}</span></label>`).join('');
+  $('#tastePreview').textContent=tasteBlock().replace(/\\n/g,'\n');
+  $$('input[name=taste]').forEach(r=>r.addEventListener('change',()=>{S.taste=r.value;save();$('#tastePreview').textContent=tasteBlock()}))}
+$('#presets').addEventListener('click',e=>{const b=e.target.closest('[data-preset]');if(!b)return;const p=PRESETS[Number(b.dataset.preset)];
+  $('#presetConfirm').innerHTML=`<div class="confirm">「${p.n}」のテーマ・絵柄(${TASTES[p.taste].n})・セリフ(${TPL[p.tpl].n})を入れます。今のセリフは置き換わります。<button class="btn primary" type="button" data-pa="all" data-i="${b.dataset.preset}">全部入れる</button><button class="btn" type="button" data-pa="keep" data-i="${b.dataset.preset}">セリフはそのまま</button><button class="btn ghost" type="button" data-pa="no">やめる</button></div>`});
+$('#presetConfirm').addEventListener('click',async e=>{const b=e.target.closest('[data-pa]');if(!b)return;const a=b.dataset.pa;$('#presetConfirm').innerHTML='';if(a==='no')return;const p=PRESETS[Number(b.dataset.i)];
+  S.theme=p.theme;S.taste=p.taste;S.charName=p.nm;if(a==='all')applyTpl(p.tpl);save();await ensureFonts();renderSetup();renderRail();toast(a==='all'?`「${p.n}」を入れました(最大文字数:${S.txt.maxChars}文字)`:`「${p.n}」のテーマと絵柄を入れました`)});
+function applyTpl(k){S.tpl=k;S.phrases=tplPhrases(k);const lg=Math.max(...S.phrases.slice(0,S.count).map(p=>Math.max([...p.t].length,p.s2?[...p.s2.t].length:0)));const n=Math.min(10,Math.max(5,lg));S.txt.maxChars=n;S.stickers.forEach(st=>{if(st&&st.ts)st.ts.maxChars=n})}
+function renderRef(){const t=$('#refThumb');t.innerHTML=S.ref?`<img alt="見本画像" src="${S.ref}">`:'見本なし';$('#refClear').hidden=!S.ref}
+$$('input[name=prov]').forEach(r=>r.addEventListener('change',()=>{S.provider=r.value;save();renderSetup()}));
+[['customName','customName'],['customUrl','customUrl'],['theme','theme'],['charName','charName'],['style','style'],['userPrompt','userPrompt']].forEach(([id,k])=>$('#'+id).addEventListener('input',e=>{S[k]=e.target.value;if(k==='style'||k==='theme')$('#tastePreview').textContent=tasteBlock();if(k==='theme')themeHint();save();updateAiLinks();renderRail()}));
+$('#projName').addEventListener('input',e=>{S.name=e.target.value||'名前なし';save();renderRail();const o=$('#projSel').querySelector(`option[value="${S.id}"]`);if(o)o.textContent=S.name});
+$('#count').addEventListener('change',e=>{S.count=Number(e.target.value);while(S.phrases.length<S.count)S.phrases.push({t:'',p:''});save();renderRail()});
+$('#layout').addEventListener('change',e=>{const v=e.target.value;if(filled()>0&&v!==S.layout){e.target.value=S.layout;$('#layoutConfirm').innerHTML=`<div class="confirm">読み込み済みの画像はそのまま残りますが、各回が担当する番号が変わります。変えますか?<button class="btn primary" type="button" data-lv="${v}">変える</button><button class="btn ghost" type="button" data-lv="">やめる</button></div>`;return}S.layout=v;save()});
+$('#layoutConfirm').addEventListener('click',e=>{const b=e.target.closest('[data-lv]');if(!b)return;if(b.dataset.lv){S.layout=b.dataset.lv;$('#layout').value=S.layout;save();toast('作る数を変えました')}$('#layoutConfirm').innerHTML=''});
+$('#aspect').addEventListener('change',e=>{S.aspect=e.target.value;save()});
+$('#bg').addEventListener('change',e=>{S.bg=e.target.value;save()});
+$('#refFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const c=await fileToCanvas(f,700);S.ref=c.toDataURL('image/png');refImg=await loadImg(S.ref);save();renderRef();toast('見本画像を入れました')}catch(err){toast(err.message)}});
+$('#refClear').addEventListener('click',()=>{S.ref=null;refImg=null;save();renderRef()});
+$('#projSel').addEventListener('change',async e=>{await saveNow();busy(true,'セットを開いています…');try{const st=await DB.get('p:'+e.target.value);if(st){await loadState(st);await saveNow();go(1)}}finally{busy(false)}});
+$('#projNew').addEventListener('click',async()=>{await saveNow();const n=defaults();n.name=`スタンプ${INDEX.length+1}`;n.provider=S.provider;n.customName=S.customName;n.customUrl=S.customUrl;await loadState(n);await saveNow();go(1);toast('新しいセットを作りました')});
+$('#projDup').addEventListener('click',async()=>{await saveNow();const c=JSON.parse(JSON.stringify(S));c.id=newId();c.name=S.name+'(コピー)';c.sheetSaved={};await loadState(c);await saveNow();go(1);toast('複製しました')});
+const DEL_BTN='<button class="btn danger" type="button" id="projDel">このセットを削除</button>';
+$('#projDelArea').addEventListener('click',async e=>{const a=$('#projDelArea'),id=e.target.id;
+  if(id==='projDel')a.innerHTML=`<div class="confirm">「${esc(S.name)}」を削除します。元に戻せません。<button class="btn danger" type="button" id="projDelYes">削除する</button><button class="btn ghost" type="button" id="projDelNo">やめる</button></div>`;
+  if(id==='projDelNo')a.innerHTML=DEL_BTN;
+  if(id==='projDelYes'){a.innerHTML=DEL_BTN;try{await DB.del('p:'+S.id);for(let i=0;i<40;i++)await DB.del(`img:${S.id}:${i}`);for(let k=0;k<40;k++)await DB.del(`sheet:${S.id}:${k}`)}catch(e){}INDEX=INDEX.filter(x=>x.id!==S.id);
+    let st=null;if(INDEX.length){INDEX.sort((a,b)=>b.updated-a.updated);try{st=await DB.get('p:'+INDEX[0].id)}catch(e){}}
+    await loadState(st||defaults());await saveNow();go(1);toast('削除しました')}});
+$('#bkSave').addEventListener('click',async()=>{await saveNow();const blob=new Blob([JSON.stringify({app:'stamp-kobo',v:2,project:S})],{type:'application/json'});await saveFile(`${(S.name||'stamp').replace(/[\\/:*?"<>|]/g,'_')}_backup.json`,blob)});
+$('#bkLoad').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;busy(true,'読み込んでいます…');
+  try{const j=JSON.parse(await f.text());if(!j||j.app!=='stamp-kobo'||!j.project)throw new Error('スタンプ工房のバックアップではありません');await saveNow();const p=j.project;p.id=newId();p.name=(p.name||'スタンプ')+'(読み込み)';p.sheetSaved={};await loadState(p);await saveNow();go(1);toast('バックアップを読み込みました')}
+  catch(err){toast(err.message||'読み込めませんでした')}finally{busy(false)}});
+
+/* ---------- step 2 ---------- */
+let fontT;
+function onGlobalTs(patch,rebuild){Object.assign(S.txt,patch);if(patch.maxChars)S.stickers.forEach(st=>{if(st&&st.ts)st.ts.maxChars=patch.maxChars});save();if(patch.maxChars&&S.step===2){renderDraft();return}if(patch.font){ensureFonts().then(()=>refreshDraftPics())}if(rebuild)renderTextCard();refreshDraftPics()}
+function renderTextCard(){$$('input[name=tmode]').forEach(r=>r.checked=r.value===S.textMode);$('#textCard').hidden=S.textMode!=='system';
+  if(S.textMode==='system')buildTc($('#globalTc'),()=>S.txt,onGlobalTs,S.phrases[0]?.t||'おはよう')}
+$$('input[name=tmode]').forEach(r=>r.addEventListener('change',()=>{S.textMode=r.value;save();renderTextCard();refreshDraftPics()}));
+function slotPic(i,opts={}){
+  const pic=document.createElement('div');pic.className='pic checker';
+  const no=document.createElement('span');no.className='no';no.textContent=pad(i+1);pic.appendChild(no);
+  pic.appendChild(renderSt(i,W,H,M,true,true));
+  if(opts.badge){const is=issues(i);if(is.length){const b=document.createElement('span');b.className='badge pill '+(is[0]==='未作成'?'':'warn');b.textContent=is.join('・');pic.appendChild(b)}}
+  return pic;
+}
+function buildSub(root,i,after){const ph=S.phrases[i]||(S.phrases[i]={t:'',p:''});root.innerHTML='';
+  if(!ph.s2){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.style.cssText='min-height:40px;font-size:14px;padding:6px 10px';b.textContent='+ 2か所目の文字';b.onclick=()=>{ph.s2={t:'',pos:'tr',k:0.7};save();buildSub(root,i,after);after()};root.appendChild(b);return}
+  const w=document.createElement('div');w.style.cssText='display:grid;gap:6px';
+  w.innerHTML=`<input type="text" placeholder="2か所目の文字" aria-label="${i+1}番の2か所目の文字"><select aria-label="2か所目の位置">${POSL.map(([k,n])=>`<option value="${k}">位置:${n}</option>`).join('')}</select><select aria-label="2か所目の大きさ"><option value="1">大きさ:同じ</option><option value="0.7">大きさ:7割</option><option value="0.3">大きさ:3割</option></select><button type="button" class="btn ghost" style="min-height:40px;font-size:14px;padding:6px 10px">2か所目を消す</button>`;
+  const [ti,ps,ks,del]=w.children;ti.value=ph.s2.t;ti.maxLength=maxN();ps.value=ph.s2.pos||'tr';ks.value=String(ph.s2.k||0.7);
+  for(const el of [ti,ps,ks])el.style.cssText='font-size:15px;padding:7px 9px';
+  ti.oninput=()=>{ph.s2.t=ti.value;save();after()};ps.onchange=()=>{ph.s2.pos=ps.value;save();after()};ks.onchange=()=>{ph.s2.k=Number(ks.value);save();after()};
+  del.onclick=()=>{ph.s2=null;save();buildSub(root,i,after);after()};root.appendChild(w)}
+function refreshDraftPics(){$$('#draftSlots .slot').forEach((el,i)=>{const old=el.querySelector('.pic');old.replaceWith(slotPic(i))})}
+function markDups(){const d=dupSets();let n=0;$$('#draftSlots .slot').forEach((el,i)=>{const [a,b]=el.querySelectorAll('.meta input');const ph=S.phrases[i];const ta=d.t.has((ph.t||'').trim()),pb=d.p.has((ph.p||'').trim());a.classList.toggle('dup',ta);b.classList.toggle('dup',pb);if(ta||pb)n++});
+  $('#dupNote').textContent=n?`黄色の欄は、ほかのスタンプと同じセリフかポーズです(${n}個)。違う内容にすると、絵柄がかぶりにくくなります。`:'セリフ・ポーズのかぶりはありません。'}
+function renderDraft(){
+  renderTextCard();
+  $('#tplSel').innerHTML=TPL_ORDER.map(k=>`<option value="${k}">${TPL[k].n}</option>`).join('');$('#tplSel').value=S.tpl||'daily';$('#tplConfirm').innerHTML='';
+  const box=$('#draftSlots');box.innerHTML='';
+  for(let i=0;i<S.count;i++){const ph=S.phrases[i]||(S.phrases[i]={t:'',p:''});
+    const el=document.createElement('div');el.className='slot';el.appendChild(slotPic(i));
+    const m=document.createElement('div');m.className='meta';m.innerHTML=`<input type="text" id="ph-t-${i}" aria-label="${i+1}番のセリフ" placeholder="セリフ"><input type="text" id="ph-p-${i}" aria-label="${i+1}番のポーズ" placeholder="ポーズ・表情">`;
+    el.appendChild(m);box.appendChild(el);const [ti,pi]=m.children;ti.value=ph.t;pi.value=ph.p;ti.maxLength=maxN();
+    const cnt=document.createElement('span');cnt.className='cnt';m.insertBefore(cnt,pi);
+    const upd=()=>{const n=[...ti.value].length;cnt.textContent=`${n}/${maxN()}文字`;cnt.classList.toggle('over',n>maxN());ti.classList.toggle('over',n>maxN())};upd();
+    const repic=()=>{clearTimeout(el._t);el._t=setTimeout(async()=>{await ensureFonts();el.querySelector('.pic').replaceWith(slotPic(i))},250)};
+    const sub=document.createElement('div');m.appendChild(sub);buildSub(sub,i,repic);
+    ti.addEventListener('input',()=>{ph.t=ti.value;save();upd();repic();markDups()});
+    pi.addEventListener('input',()=>{ph.p=pi.value;save();markDups();if(!has(i)&&!refImg){el.querySelector('.pic').replaceWith(slotPic(i))}});
+  }
+  markDups();
+}
+function moodText(){return {humor:'クスッと笑えるユーモアのある言葉。日常のあるあるや、ちょっと大げさな言い回し、自分ツッコミなど',cute:'かわいくてやさしい言葉。毎日のあいさつや気持ちを伝える言葉',polite:'ていねいで仕事でも使える言葉。敬語や感謝・確認の言葉'}[$('#moodSel').value]}
+function phrasePrompt(){const mood=$('#moodSel').value;const N=maxN();
+  const md={humor:'クスッと笑えるユーモアのある言葉。日常のあるあるや、ちょっと大げさな言い回し、自分ツッコミなど',cute:'かわいくてやさしい言葉。毎日のあいさつや気持ちを伝える言葉',polite:'ていねいで仕事でも使える言葉。敬語や感謝・確認の言葉'}[mood];
+  return phraseBase(md,N)+`\n\n【出力形式】説明・見出し・番号は付けず、1行に1個だけ書く\n決めゼリフ/ポーズ/前置き(なければ空)\n\n例:\n感謝!/洗濯かごを抱えてキラキラ/洗濯物\nおやすみ/まくらを抱えて眠そう/`}
+function phraseBase(md,N){
+  return `LINEスタンプのセリフを${S.count}個考えてください。\n\nキャラ・テーマ:${S.theme||'かわいいキャラクター'}\n雰囲気:${md}\n\n【条件】\n・決めゼリフは${N}文字以内(!や?も1文字と数える)\n・必要なら決めゼリフの前に小さく入れる「前置き」(${N}文字以内)を付ける。例:前置き「洗濯物」+決めゼリフ「感謝!」\n・前置きは全体の3〜4割くらいにして、なくてもよい\n・それぞれに合うポーズ・表情を1つずつ考える\n・${S.count}個すべて違う内容にして、ポーズもかぶらないようにする\n・実在のスタンプのセリフをまねせず、オリジナルにする`}
+$('#copyPhrasePrompt').addEventListener('click',()=>copyText(phrasePrompt()));
+$('#phraseImport').addEventListener('click',async()=>{const lines=$('#phrasePaste').value.split(/\r?\n/).map(l=>l.replace(/^\s*[-・*]?\s*\d+\s*[\.\)、:：]\s*/,'').trim()).filter(l=>l&&/[\/／]/.test(l));
+  if(!lines.length){toast('取り込める行がありません。「決めゼリフ/ポーズ/前置き」の形か確認してください',4000);return}
+  const items=lines.slice(0,S.count).map(l=>{const [t,p,s]=l.split(/[\/／]/).map(x=>(x||'').trim().replace(/^「|」$/g,''));return{t:t||'',p:p||'',s2:s?{t:s,pos:'tc',k:0.7}:null}});
+  for(let i=0;i<items.length;i++)S.phrases[i]=items[i];
+  const lg=Math.max(...S.phrases.slice(0,S.count).map(p=>Math.max([...(p.t||'')].length,p.s2?[...p.s2.t].length:0)));S.txt.maxChars=Math.min(10,Math.max(5,lg));
+  save();await ensureFonts();renderDraft();$('#phrasePaste').value='';toast(`${items.length}個のセリフを取り込みました${items.length<S.count?`(残り${S.count-items.length}個は今のまま)`:''}`,4000)});
+$('#tplUse').addEventListener('click',()=>{$('#tplConfirm').innerHTML=`<div class="confirm">今のセリフとポーズを「${TPL[$('#tplSel').value].n}」に置き換えます。<button class="btn primary" type="button" id="tplYes">置き換える</button><button class="btn ghost" type="button" id="tplNo">やめる</button></div>`});
+$('#tplConfirm').addEventListener('click',async e=>{if(e.target.id==='tplNo')$('#tplConfirm').innerHTML='';if(e.target.id==='tplYes'){const k=$('#tplSel').value;applyTpl(k);const n=S.txt.maxChars;save();await ensureFonts();renderDraft();toast(`テンプレートを入れました(最大文字数:${n}文字)`)}});
+
+/* ---------- step 3 ---------- */
+function renderSheets(){
+  $('#charPrompt').textContent=charPrompt();$('#charCard').hidden=!!S.ref&&filled()>0;
+  const f=filled();$('#genCount').textContent=`${f}/${S.count} 個`;$('#genCount').className='pill '+(f===S.count?'ok':'');$('#genBar').style.width=(f/S.count*100)+'%';
+  const box=$('#sheets');box.innerHTML='';const p=per();
+  for(let k=0;k<sheetCount();k++){
+    const from=k*p.n,to=Math.min(S.count,from+p.n);let got=0;for(let i=from;i<to;i++)if(has(i))got++;
+    const card=document.createElement('div');card.className='card sheet-card';
+    card.innerHTML=`<div class="row"><h3>${sheetCount()>1?`${k+1}回目`:'生成'}<span class="small muted" style="font-family:var(--f-body);font-weight:400"> ${pad(from+1)}〜${pad(to)}番</span></h3><span class="pill ${got===to-from?'ok':got?'accent':''}">${got===to-from?'✓ ':''}${got}/${to-from} 読み込み済み</span></div>
+      <p class="list"></p><div class="thumbs"></div>
+      <p class="note">${S.ref?'AIアプリに<b>見本画像を添付してから</b>指示文を貼ってください。添付を忘れると絵柄がずれます。':'キャラの見本を作った会話の続きで送ると、絵柄がそろいやすくなります。'}</p>
+      <div class="btns"><button class="btn dark" type="button" data-copy="${k}">① 指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a><label class="btn primary">③ できた画像を読み込む<input type="file" accept="image/*" data-sheet="${k}"></label><button class="btn" type="button" data-adjust="${k}" ${p.n>1&&S.sheetSaved&&S.sheetSaved[k]===S.layout?'':'hidden'}>区切りを調整</button></div>
+      <details><summary>指示文を見る</summary><pre class="prompt"></pre></details>`;
+    card.querySelector('.list').textContent=S.phrases.slice(from,to).map(x=>x.t||'(文字なし)').join('・');
+    card.querySelector('pre').textContent=sheetPrompt(k);
+    const th=card.querySelector('.thumbs');th.style.gridTemplateColumns=`repeat(${Math.min(8,to-from)},1fr)`;
+    for(let i=from;i<to;i++){const c=renderSt(i,W,H,M,true,true);c.className='checker';th.appendChild(c)}
+    box.appendChild(card);
+  }
+  box.querySelectorAll('[data-adjust]').forEach(b=>b.addEventListener('click',()=>openCut(Number(b.dataset.adjust))));
+  box.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyText(sheetPrompt(Number(b.dataset.copy)))));
+  box.querySelectorAll('[data-sheet]').forEach(inp=>inp.addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)await importSheet(f,Number(inp.dataset.sheet))}));
+  updateAiLinks();
+}
+$('#copyChar').addEventListener('click',()=>copyText(charPrompt()));
+async function importSheet(f,k){
+  busy(true,'切り分けと透明化をしています…');await tick();
+  try{const raw=await fileToCanvas(f,2400);const proc=removeBg(raw,60,false);const p=per();const from=k*p.n,to=Math.min(S.count,from+p.n);
+    const cells=p.n===1?[{raw,proc}]:splitSheet(proc,raw,p.cols,p.rows);let ok=0;
+    for(let j=0;j<cells.length&&from+j<to;j++){const t=cleanTrim(cells[j].proc);if(!t)continue;newSticker(from+j,cells[j].raw,t);ok++}
+    if(p.n>1){try{await DB.set(`sheet:${S.id}:${k}`,{raw:raw.toDataURL('image/png')});S.sheetSaved[k]=S.layout}catch(e){}}
+    save();renderSheets();renderRail();
+    toast(ok===to-from?`${ok}個を読み込みました${p.n>1?'(ずれていたら「区切りを調整」)':''}`:`${ok}個を読み込みました(${to-from-ok}個は見つかりませんでした。「区切りを調整」か手直しで直せます)`,4000);afterFill()}
+  catch(err){toast(err.message||'読み込みに失敗しました')}finally{busy(false)}
+}
+$('#ownFiles').addEventListener('change',async e=>{
+  const files=[...e.target.files];e.target.value='';if(!files.length)return;busy(true,'画像を整えています…');await tick();let n=0,skip=0;
+  try{for(const f of files){let i=-1;for(let k=0;k<S.count;k++)if(!S.stickers[k]){i=k;break}if(i<0){skip++;continue}
+    const raw=await fileToCanvas(f,1400);const t=cleanTrim(removeBg(raw,60,false));if(!t){skip++;continue}newSticker(i,raw,t);n++}
+    save();renderSheets();renderRail();toast(`${n}個を入れました${skip?`(${skip}個は入りませんでした)`:''}`);afterFill()}catch(err){toast(err.message)}finally{busy(false)}
+});
+
+/* ---------- cut adjust ---------- */
+let CUT=null;
+async function openCut(k){busy(true,'読み込んでいます…');await tick();
+  try{const sh=await DB.get(`sheet:${S.id}:${k}`);if(!sh)throw new Error('元の画像が見つかりません。もう一度読み込んでください');const raw=imgToCanvas(await loadImg(sh.raw));const proc=removeBg(raw,60,false);const p=per();
+    CUT={k,raw,proc,p,cu:autoCuts(proc,p.cols,p.rows),drag:null};$('#cutM').hidden=false;document.body.style.overflow='hidden';drawCut()}
+  catch(e){toast(e.message||'開けませんでした')}finally{busy(false)}}
+function drawCut(){const {proc,cu,p}=CUT;const cv=$('#cutCv');const sc=Math.min(1,1000/proc.width);cv.width=Math.round(proc.width*sc);cv.height=Math.round(proc.height*sc);CUT.sc=sc;const x=ctx(cv);checkerBg(x,cv.width,cv.height,16);x.drawImage(proc,0,0,cv.width,cv.height);
+  const lw=Math.max(3,cv.width/250);x.lineWidth=lw;x.strokeStyle='#D63A5A';x.fillStyle='#D63A5A';
+  for(let r=1;r<p.rows;r++){const y=cu.rc[r]*sc;x.beginPath();x.moveTo(0,y);x.lineTo(cv.width,y);x.stroke();x.beginPath();x.arc(cv.width/2,y,lw*3.5,0,Math.PI*2);x.fill()}
+  for(let r=0;r<p.rows;r++)for(let c=1;c<p.cols;c++){const X=cu.ccs[r][c]*sc,y0=cu.rc[r]*sc,y1=cu.rc[r+1]*sc;x.beginPath();x.moveTo(X,y0);x.lineTo(X,y1);x.stroke();x.beginPath();x.arc(X,(y0+y1)/2,lw*3.5,0,Math.PI*2);x.fill()}
+  x.font=`700 ${Math.round(cv.width/28)}px sans-serif`;x.textBaseline='top';
+  for(let r=0;r<p.rows;r++)for(let c=0;c<p.cols;c++){const n=CUT.k*p.n+r*p.cols+c+1;if(n>S.count)continue;const tx=cu.ccs[r][c]*sc+8,ty=cu.rc[r]*sc+8;x.fillStyle='rgba(255,255,255,.85)';x.fillRect(tx-4,ty-2,x.measureText(pad(n)).width+8,cv.width/28+6);x.fillStyle='#1C2629';x.fillText(pad(n),tx,ty)}}
+function cutPt(e){const cv=$('#cutCv'),r=cv.getBoundingClientRect();const k=cv.width/r.width/CUT.sc;return{x:(e.clientX-r.left)*k,y:(e.clientY-r.top)*k,tol:24*k}}
+$('#cutCv').addEventListener('pointerdown',e=>{if(!CUT)return;const q=cutPt(e);const {cu,p}=CUT;let best=null,bd=q.tol;
+  for(let r=1;r<p.rows;r++){const d=Math.abs(q.y-cu.rc[r]);if(d<bd){bd=d;best={t:'h',r}}}
+  for(let r=0;r<p.rows;r++)if(q.y>=cu.rc[r]&&q.y<=cu.rc[r+1])for(let c=1;c<p.cols;c++){const d=Math.abs(q.x-cu.ccs[r][c]);if(d<bd){bd=d;best={t:'v',r,c}}}
+  if(best){CUT.drag=best;$('#cutCv').setPointerCapture(e.pointerId);e.preventDefault()}});
+$('#cutCv').addEventListener('pointermove',e=>{if(!CUT||!CUT.drag)return;const q=cutPt(e);const {cu}=CUT,d=CUT.drag;
+  if(d.t==='h')cu.rc[d.r]=Math.round(Math.min(cu.rc[d.r+1]-10,Math.max(cu.rc[d.r-1]+10,q.y)));else{const a=cu.ccs[d.r];a[d.c]=Math.round(Math.min(a[d.c+1]-10,Math.max(a[d.c-1]+10,q.x)))}drawCut()});
+const cutEnd=()=>{if(CUT)CUT.drag=null};$('#cutCv').addEventListener('pointerup',cutEnd);$('#cutCv').addEventListener('pointercancel',cutEnd);
+function closeCut(){$('#cutM').hidden=true;document.body.style.overflow='';CUT=null}
+$('#cutClose').addEventListener('click',closeCut);
+$('#cutAuto').addEventListener('click',()=>{if(!CUT)return;CUT.cu=autoCuts(CUT.proc,CUT.p.cols,CUT.p.rows);drawCut()});
+$('#cutApply').addEventListener('click',async()=>{if(!CUT)return;busy(true,'切り分けています…');await tick();
+  try{const {proc,raw,cu,p,k}=CUT;const from=k*p.n,to=Math.min(S.count,from+p.n);const cells=cellsFrom(proc,raw,cu,p.cols,p.rows);let ok=0;
+    for(let j=0;j<cells.length&&from+j<to;j++){const t=cleanTrim(cells[j].proc);if(!t)continue;newSticker(from+j,cells[j].raw,t);ok++}
+    save();closeCut();renderSheets();renderRail();toast(`${ok}個を切り分け直しました`);afterFill()}finally{busy(false)}});
+
+/* ---------- step 4 + editor ---------- */
+function renderFix(){
+  const box=$('#fixSlots');box.innerHTML='';let warn=0;
+  for(let i=0;i<S.count;i++){const b=document.createElement('button');b.type='button';b.className='slot';const pic=slotPic(i,{badge:true});if(pic.querySelector('.pill.warn'))warn++;b.appendChild(pic);
+    const cap=document.createElement('div');cap.className='cap';cap.textContent=S.phrases[i]?.t||'(文字なし)';b.appendChild(cap);b.addEventListener('click',()=>openEd(i));box.appendChild(b)}
+  const f=filled();$('#fixSummary').textContent=`${f}/${S.count} 個作成済み${warn?`・直したほうがよい ${warn}個`:''}`;$('#fixSummary').className='pill '+(f===S.count&&!warn?'ok':warn?'warn':'');
+}
+let EI=0,erasing=false;
+function openEd(i){EI=i;$('#ed').hidden=false;document.body.style.overflow='hidden';$('#edNote').value='';syncEd();drawEd()}
+function closeEd(){$('#ed').hidden=true;document.body.style.overflow='';setErase(false);renderRail();renderStep(S.step)}
+function onStTs(patch,rebuild){const st=S.stickers[EI];if(!st)return;st.ts=Object.assign({},st.ts||S.txt,patch);save();if(patch.font)ensureFonts().then(drawEd);if(rebuild)syncTc();drawEd()}
+function syncTc(){
+  const st=S.stickers[EI];const h=has(EI);const ai=S.textMode==='ai';
+  $('#edAiNote').hidden=!ai||!h;$('#edForce').checked=!!(st&&st.ts&&st.ts.force);
+  const showTc=h&&(!ai||(st&&st.ts&&st.ts.force));$('#edTcWrap').hidden=!showTc;
+  if(showTc){$('#edTsState').textContent=st.ts&&!st.ts.force?'このスタンプだけ個別の文字設定になっています。':'全体の文字設定を使っています。変えるとこのスタンプだけに反映されます。';
+    buildTc($('#edTc'),()=>txtStyle(EI),onStTs,S.phrases[EI]?.t||'おはよう',{editor:true});$('#edTsReset').hidden=!(st.ts&&!st.ts.force)}
+}
+function syncEd(){
+  UNDO=[];updUndo();
+  const st=S.stickers[EI],h=has(EI);$('#edTitle').textContent=`${pad(EI+1)}番 ${S.phrases[EI]?.t?`「${S.phrases[EI].t}」`:''}`;
+  $$('#ed [data-need="img"]').forEach(b=>b.hidden=!h);$('#edText').value=S.phrases[EI]?.t||'';
+  $('#edText').maxLength=maxN();buildSub($('#edSub'),EI,()=>{clearTimeout(drawEd._t);drawEd._t=setTimeout(()=>ensureFonts().then(drawEd),200)});
+  syncTc();if(!h)return;
+  $('#edScale').value=Math.round(st.scale*100);$('#edDx').value=Math.round(st.dx*100);$('#edDy').value=Math.round(st.dy*100);$('#edTol').value=st.tol||60;$('#edGlobal').checked=!!st.global;
+}
+function drawEd(skip){
+  const cv=$('#edCv'),x=ctx(cv);x.clearRect(0,0,W,H);const r=renderSt(EI,W,H,M,true,true);x.drawImage(r,0,0);
+  if(skip){}else if(has(EI)){const is=issues(EI);const msg={余白:'点線の外側に絵か文字がはみ出しています。大きさか位置を調整してください。',背景:'背景が消えていないかもしれません。「背景を消し直す」を試してください。',小さい:'絵が小さすぎます。「大きさ」を上げてください。',文字小:'文字が小さく読みにくいです。文字を短くしてください。',文字数:'最大文字数を超えています。文字を短くするか、STEP 2で最大文字数を増やしてください。'};
+    const t=is.map(k=>msg[k]).filter(Boolean).join(' ');$('#edWarn').hidden=!t;$('#edWarn').textContent=t}
+  else{$('#edWarn').hidden=false;$('#edWarn').textContent='まだ画像がありません。下の「AIで作り直す」から作って読み込んでください。'}
+  x.save();x.setLineDash([6,5]);x.strokeStyle='rgba(214,58,90,.85)';x.lineWidth=1.5;x.strokeRect(M,M,W-2*M,H-2*M);x.restore();
+}
+const bindR=(id,fn)=>$(id).addEventListener('input',e=>{const st=S.stickers[EI];if(!st)return;fn(st,e.target.value);save();drawEd()});
+bindR('#edScale',(s,v)=>s.scale=v/100);bindR('#edDx',(s,v)=>s.dx=v/100);bindR('#edDy',(s,v)=>s.dy=v/100);
+$('#edText').addEventListener('input',async e=>{const ph=S.phrases[EI]||(S.phrases[EI]={t:'',p:''});ph.t=e.target.value;save();await ensureFonts();drawEd()});
+$('#edForce').addEventListener('change',e=>{const st=S.stickers[EI];if(!st)return;st.ts=e.target.checked?Object.assign({},S.txt,{force:true}):null;save();syncTc();drawEd()});
+$('#edTsReset').addEventListener('click',()=>{const st=S.stickers[EI];if(!st)return;st.ts=null;save();syncTc();drawEd();toast('全体の設定に戻しました')});
+$('#edTsAll').addEventListener('click',()=>{const ts=txtStyle(EI);S.txt=Object.assign(defTxt(),ts);delete S.txt.force;S.stickers.forEach(s=>{if(s&&s.ts&&!s.ts.force)s.ts=null});save();syncTc();drawEd();toast('この文字設定を全部に使いました')});
+$('#edTol').addEventListener('input',e=>{const st=S.stickers[EI];if(st){st.tol=Number(e.target.value);save()}});
+$('#edGlobal').addEventListener('change',e=>{const st=S.stickers[EI];if(st){st.global=e.target.checked;save()}});
+$('#edRedo').addEventListener('click',async()=>{const st=S.stickers[EI];if(!st)return;busy(true,'背景を消し直しています…');await tick();
+  try{const raw=imgToCanvas(await loadImg(st.orig));const t=cleanTrim(removeBg(raw,st.tol||60,st.global));if(!t)toast('絵が見つかりませんでした。消し具合を下げてください');else{RT[EI]={cv:t,ver:++VER};st.src=t.toDataURL('image/png');DIRTY.add(EI);save();drawEd()}}finally{busy(false)}});
+$('#edReset').addEventListener('click',async()=>{const st=S.stickers[EI];if(!st)return;busy(true);await tick();
+  try{const raw=imgToCanvas(await loadImg(st.orig));const t=cleanTrim(removeBg(raw,60,false));if(t){RT[EI]={cv:t,ver:++VER};Object.assign(st,{src:t.toDataURL('image/png'),scale:1,dx:0,dy:0,tol:60,global:false});DIRTY.add(EI);save();syncEd();drawEd();toast('読み込んだ直後の状態に戻しました')}}finally{busy(false)}});
+$('#edCopy').addEventListener('click',()=>copyText(fixPrompt(EI)));
+$('#edFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;busy(true,'画像を整えています…');await tick();
+  try{const raw=await fileToCanvas(f,1400);const t=cleanTrim(removeBg(raw,60,false));if(!t)toast('絵が見つかりませんでした');else{newSticker(EI,raw,t);save();syncEd();drawEd();toast('差し替えました')}}catch(err){toast(err.message)}finally{busy(false)}});
+const CLEAR_BTN='<button class="btn danger" type="button" id="edClear">この枠を空にする</button>';
+$('#edClearArea').addEventListener('click',e=>{const a=$('#edClearArea'),id=e.target.id;
+  if(id==='edClear')a.innerHTML=`<div class="confirm">この枠の画像を消します。<button class="btn danger" type="button" id="edClearYes">消す</button><button class="btn ghost" type="button" id="edClearNo">やめる</button></div>`;
+  if(id==='edClearNo')a.innerHTML=CLEAR_BTN;if(id==='edClearYes'){S.stickers[EI]=null;RT[EI]=null;save();a.innerHTML=CLEAR_BTN;syncEd();drawEd()}});
+$('#edClose').addEventListener('click',closeEd);
+$('#ed').addEventListener('click',e=>{if(e.target.id==='ed')closeEd()});
+document.addEventListener('keydown',e=>{if(!$('#ed').hidden&&e.key==='Escape')closeEd()});
+$('#edPrev').addEventListener('click',()=>{EI=(EI-1+S.count)%S.count;$('#edNote').value='';syncEd();drawEd()});
+$('#edNext').addEventListener('click',()=>{EI=(EI+1)%S.count;$('#edNote').value='';syncEd();drawEd()});
+function setErase(on){erasing=on;$('#edErase').setAttribute('aria-pressed',String(on));$('#edErase').textContent=on?'消しゴム:オン(絵をなぞる)':'消しゴム:オフ';$('#edStage').classList.toggle('erasing',on)}
+$('#edErase').addEventListener('click',()=>setErase(!erasing));
+let drawing=false;
+function eraseAt(e){const st=S.stickers[EI];if(!st||!RT[EI])return;const cv=$('#edCv'),r=cv.getBoundingClientRect();
+  const cx=(e.clientX-r.left)*W/r.width,cy=(e.clientY-r.top)*H/r.height;const lay=layoutFor(EI,W,H,M,true);const g=imgGeom(RT[EI].cv,st,lay.rect,W,H);
+  const sx=(cx-g.px)/g.s,sy=(cy-g.py)/g.s,rad=Number($('#edBrush').value)/2/g.s*(W/r.width);
+  const x=ctx(RT[EI].cv);x.save();x.globalCompositeOperation='destination-out';x.beginPath();x.arc(sx,sy,rad,0,Math.PI*2);x.fill();x.restore();drawEd(true)}
+$('#edCv').addEventListener('pointerdown',e=>{if(!erasing||!has(EI))return;UNDO.push(cloneCv(RT[EI].cv));if(UNDO.length>15)UNDO.shift();updUndo();drawing=true;$('#edCv').setPointerCapture(e.pointerId);eraseAt(e)});
+$('#edCv').addEventListener('pointermove',e=>{if(drawing)eraseAt(e)});
+const endErase=()=>{if(!drawing)return;drawing=false;const st=S.stickers[EI];if(st&&RT[EI]){RT[EI].ver=++VER;st.src=RT[EI].cv.toDataURL('image/png');DIRTY.add(EI);save();drawEd()}};
+function updUndo(){$('#edUndo').disabled=!UNDO.length;$('#edUndo').textContent=UNDO.length?`1つ戻す(${UNDO.length})`:'1つ戻す'}
+$('#edUndo').addEventListener('click',()=>{const st=S.stickers[EI];const prev=UNDO.pop();if(!st||!prev)return;RT[EI]={cv:prev,ver:++VER};st.src=prev.toDataURL('image/png');DIRTY.add(EI);save();updUndo();drawEd()});
+$('#edCv').addEventListener('pointerup',endErase);$('#edCv').addEventListener('pointercancel',endErase);
+
+/* ---------- step 5 ---------- */
+let bgView='checker';
+function renderCheck(){
+  const ov=$('#overview');ov.innerHTML='';ov.className='overview '+(bgView==='checker'?'checker':'bg-'+bgView);
+  for(let i=0;i<S.count;i++){let c;if(has(i))c=renderSt(i);else{c=mk(W,H);const x=ctx(c);x.setLineDash([10,8]);x.strokeStyle='rgba(120,130,135,.6)';x.lineWidth=4;x.strokeRect(30,30,W-60,H-60);x.fillStyle='rgba(120,130,135,.8)';x.font='700 64px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(pad(i+1),W/2,H/2)}ov.appendChild(c)}
+  ov.hidden=bgView==='talk';$('#talkView').hidden=bgView!=='talk';
+  if(bgView==='talk'){const g=$('#talkGrid');g.innerHTML='';for(let i=0;i<S.count;i++){if(!has(i))continue;const b=document.createElement('button');b.type='button';b.setAttribute('aria-label',`${i+1}番を送信`);b.appendChild(renderSt(i));b.addEventListener('click',()=>sendTalk(i));g.appendChild(b)}
+    const tc=$('#talkTab'),tx=ctx(tc);tx.clearRect(0,0,96,74);if(has(S.tabIdx))tx.drawImage(renderSt(S.tabIdx,96,74,2,false),0,0)}
+  const opts=Array.from({length:S.count},(_,i)=>`<option value="${i}">${pad(i+1)} ${esc(S.phrases[i]?.t||'')}</option>`).join('');
+  $('#mainSel').innerHTML=opts;$('#tabSel').innerHTML=opts;if(S.mainIdx>=S.count)S.mainIdx=0;if(S.tabIdx>=S.count)S.tabIdx=0;$('#mainSel').value=S.mainIdx;$('#tabSel').value=S.tabIdx;drawMT();
+}
+function drawMT(){const m=$('#mainCv'),t=$('#tabCv');ctx(m).clearRect(0,0,240,240);ctx(t).clearRect(0,0,96,74);if(has(S.mainIdx))ctx(m).drawImage(renderSt(S.mainIdx,240,240,8,false),0,0);if(has(S.tabIdx))ctx(t).drawImage(renderSt(S.tabIdx,96,74,2,false),0,0)}
+function sendTalk(i){const log=$('#talkLog');const m=document.createElement('div');m.className='msg me';m.appendChild(renderSt(i));log.appendChild(m);log.scrollTop=log.scrollHeight}
+$$('[data-bgv]').forEach(b=>b.addEventListener('click',()=>{bgView=b.dataset.bgv;$$('[data-bgv]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));renderCheck()}));
+$('#mainSel').addEventListener('change',e=>{S.mainIdx=Number(e.target.value);save();drawMT()});
+$('#tabSel').addEventListener('change',e=>{S.tabIdx=Number(e.target.value);save();drawMT();if(bgView==='talk')renderCheck()});
+
+/* ---------- step 6 ---------- */
+const toBlob=c=>new Promise(r=>c.toBlob(r,'image/png'));
+async function runAudit(){
+  const ul=$('#audit');ul.innerHTML='<li><span class="t muted">チェックしています…</span></li>';await tick();
+  const items=[];const f=filled();
+  items.push([f===S.count,f===S.count?`${S.count}個すべてそろっています`:`${S.count-f}個の枠が空いています`,[3]]);
+  const by={余白:[],背景:[],小さい:[],文字小:[],文字数:[]};for(let i=0;i<S.count;i++)if(has(i))issues(i).forEach(k=>by[k]&&by[k].push(i));
+  const lst=a=>a.slice(0,8).map(i=>pad(i+1)).join('・')+(a.length>8?' ほか':'');
+  items.push([!by.余白.length,by.余白.length?`余白10pxの内側に収まっていない:${lst(by.余白)}番`:'すべて余白10pxの内側に収まっています',[4,by.余白[0]]]);
+  items.push([!by.背景.length,by.背景.length?`背景が透明になっていない可能性:${lst(by.背景)}番`:'背景が透明になっています',[4,by.背景[0]]]);
+  items.push([!by.小さい.length,by.小さい.length?`絵が小さすぎる:${lst(by.小さい)}番`:'絵の大きさは問題ありません',[4,by.小さい[0]]]);
+  items.push([!by.文字小.length,by.文字小.length?`文字が小さく読みにくい:${lst(by.文字小)}番`:'文字の大きさは問題ありません',[4,by.文字小[0]]]);
+  {const ov=[];for(let i=0;i<S.count;i++)if(overLen(i))ov.push(i);items.push([!ov.length,ov.length?`最大文字数(${maxN()}文字)を超えている:${lst(ov)}番`:`すべて最大文字数(${maxN()}文字)以内です`,[ov.length&&has(ov[0])?4:2,ov[0]]])}
+  const d=dupSets();const dn=d.t.size+d.p.size;items.push([!dn,dn?'同じセリフかポーズがあります(審査で「似たスタンプが多い」と言われることがあります)':'セリフ・ポーズのかぶりはありません',[2]]);
+  let big=[];for(let i=0;i<S.count;i++)if(has(i)){const b=await toBlob(renderSt(i));if(b&&b.size>1024*1024)big.push(i)}
+  items.push([!big.length,big.length?`1MBを超えている:${lst(big)}番`:'すべて1MB以下です',[4,big[0]]]);
+  items.push([has(S.mainIdx)&&has(S.tabIdx),has(S.mainIdx)&&has(S.tabIdx)?'メイン画像・タブ画像を選んでいます':'メイン画像・タブ画像を選んでください',[5]]);
+  const mOk=META.every(([k,,max])=>[...(S.meta[k]||'')].length<=max)&&S.meta.titleJa&&S.meta.descJa&&S.meta.titleEn&&S.meta.descEn&&S.meta.creator&&S.meta.copyright;
+  items.push([!!mOk,mOk?'タイトル・説明文などを入力済みです':'タイトル・説明文・クリエイター名・コピーライトを入れてください(文字数の上限も確認)',[6]]);
+  ul.innerHTML='';items.forEach(([ok,t,fix])=>{const li=document.createElement('li');li.className=ok?'ok':'ng';li.innerHTML=`<span class="ic">${ok?'✓':'!'}</span><span class="t"></span>`;li.querySelector('.t').textContent=t;
+    if(!ok&&!(fix[0]===6)){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent='直す';b.onclick=()=>{go(fix[0]);if(fix[0]===4&&fix[1]!=null)openEd(fix[1])};li.appendChild(b)}ul.appendChild(li)});
+}
+function renderApply(){
+  const f=filled();$('#zipLast').textContent=pad(S.count);$('#zipState').textContent=`${f}/${S.count} 個`;$('#zipState').className='pill '+(f===S.count?'ok':'warn');$('#zipBtn').disabled=f<S.count;
+  const box=$('#metaFields');box.innerHTML='';
+  META.forEach(([k,label,max,multi])=>{const id='meta-'+k;const row=document.createElement('label');row.className='f';
+    row.innerHTML=`<span style="display:flex;justify-content:space-between;gap:8px">${label}<span class="count"></span></span><div class="field-row">${multi?`<textarea id="${id}"></textarea>`:`<input type="text" id="${id}">`}<button class="btn" type="button">コピー</button></div>`;
+    box.appendChild(row);const inp=row.querySelector('#'+id),cnt=row.querySelector('.count');inp.value=S.meta[k]||'';
+    const upd=()=>{const n=[...inp.value].length;cnt.textContent=`${n}/${max}`;cnt.classList.toggle('over',n>max)};upd();
+    inp.addEventListener('input',()=>{S.meta[k]=inp.value;save();upd();renderRail()});row.querySelector('button').addEventListener('click',()=>copyText(inp.value))});
+  const ch=$('#checks');ch.innerHTML='';CHECKS.forEach((t,k)=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" id="chk-${k}"><span></span>`;l.querySelector('span').textContent=t;const c=l.querySelector('input');c.checked=!!S.checks[k];c.addEventListener('change',()=>{S.checks[k]=c.checked;save()});ch.appendChild(l)});
+  runAudit();
+}
+$('#auditRun').addEventListener('click',runAudit);
+const KIND={daily:['毎日スタンプ','毎日のあいさつや返事に使える','everyday greetings and replies'],humor_daily:['ゆかいなスタンプ','クスッと笑えるひと言をそろえた','funny everyday phrases'],humor_family:['おうちスタンプ','家族や夫婦のやりとりがクスッと楽しくなる','fun messages for family'],humor_work:['おしごとスタンプ','仕事のあるあるをクスッと伝えられる','funny work-life phrases'],keigo:['ていねいスタンプ','仕事や目上の人にも使えるていねいな','polite phrases for work'],family:['家族スタンプ','家族の連絡に便利な','handy family messages'],couple:['なかよしスタンプ','大切な人に気持ちを伝える','sweet messages for someone special'],season:['季節のスタンプ','季節のイベントで使える','seasonal events']};
+function charNameOf(){return (S.charName||'').trim()||'オリジナルキャラ'}
+$('#autoMeta').addEventListener('click',()=>{const nm=charNameOf();const k=KIND[S.tpl]||KIND.daily;const cut=(t,n)=>[...t].slice(0,n).join('');
+  S.meta.titleJa=cut(`${nm}の${k[0]}`,40);
+  S.meta.descJa=cut(`${nm}が、${k[1]}${S.count}個のスタンプになりました。毎日のトークでたくさん使ってね!`,160);
+  if(!S.meta.titleEn)S.meta.titleEn=cut(`${/[ -~]/.test(nm)&&!/[^ -~]/.test(nm)?nm:'Cute Character'} Stickers`,40);
+  if(!S.meta.descEn)S.meta.descEn=cut(`${S.count} stickers for ${k[2]}. Perfect for daily chats with family and friends.`,160);
+  save();renderApply();renderRail();toast('下書きを入れました。英語は空欄のときだけ入れています',3500)});
+function metaPrompt(){return metaBase()+`\n\n【出力形式】\n案1\n日本語タイトル:\n日本語説明文:\n英語タイトル:\n英語説明文:\n(案2・案3も同じ形)`}
+function metaBase(){const ex=S.phrases.slice(0,Math.min(S.count,12)).map(p=>(p.s2&&p.s2.t?p.s2.t+' ':'')+p.t).filter(Boolean).join('、');
+  return `LINEスタンプのストアに載せる「タイトル」と「説明文」を、日本語と英語で3案ずつ考えてください。\n\n【スタンプの内容】\nキャラの名前:${charNameOf()}\nキャラの見た目:${S.theme||'(未入力)'}\nセリフの種類:${(TPL[S.tpl]||TPL.daily).n}\nセリフの例:${ex}\n個数:${S.count}個\n\n【条件】\n・日本語タイトル:40文字以内(キャラの名前を入れる)\n・日本語説明文:160文字以内(キャラの魅力と、どんな場面で使えるかを入れる)\n・英語タイトル:40文字以内(半角)\n・英語説明文:160文字以内(半角)\n・絵文字・記号の多用はしない。「最高」「No.1」などの言い過ぎた表現は使わない\n・実在の会社名・商品名・有名キャラクター名は入れない`}
+$('#copyMetaPrompt').addEventListener('click',()=>copyText(metaPrompt()));
+$('#copyEnPrompt').addEventListener('click',()=>copyText(`次のLINEスタンプのタイトルと説明文を、自然な英語に訳してください。タイトルは40文字以内、説明文は160文字以内。絵文字は使わない。\n\nタイトル:${S.meta.titleJa||'(未入力)'}\n説明文:${S.meta.descJa||'(未入力)'}`));
+/* ---------- Claude (sample) ---------- */
+let SAMPLE=null;
+function updSampleUI(){$$('[data-needs-sample]').forEach(el=>el.hidden=!SAMPLE);$$('[data-no-sample]').forEach(el=>el.hidden=!!SAMPLE);$$('details > summary').forEach(sm=>{if(/^予備:Geminiで作る/.test(sm.textContent)&&!SAMPLE){sm.textContent='Geminiで作る';sm.parentElement.open=true}})}
+(async()=>{try{if(window.claude&&window.claude.use)SAMPLE=await window.claude.use('sample')}catch(e){SAMPLE=null}updSampleUI()})();
+function sErr(e){const c=e&&e.code;return({not_granted:'Claudeの利用が許可されませんでした。ページを開き直すと、もう一度確認が出ます。',rate_limited:'混み合っています。少し待ってからもう一度押してください。',session_expired:'ログインが切れています。ページを開き直してください。',invalid_json:'答えの形がくずれました。もう一度押してください。',refused:'この内容では作れませんでした。テーマを見直してください。',cancelled:'中止しました。'})[c]||`うまく作れませんでした(${c||'エラー'})。もう一度押すか、「予備:Geminiで作る」を使ってください。`}
+$('#genMeta').addEventListener('click',async()=>{if(!SAMPLE)return;const b=$('#genMeta'),box=$('#metaCards');b.disabled=true;box.innerHTML='<p class="note">Claudeが考えています…(10〜60秒ほど)</p>';
+  try{const r=await SAMPLE.json(metaBase()+'\n\n【出力形式】次のJSONだけを返す(説明は不要):{"options":[{"titleJa":"","descJa":"","titleEn":"","descEn":""},{"titleJa":"","descJa":"","titleEn":"","descEn":""},{"titleJa":"","descJa":"","titleEn":"","descEn":""}]}',{cache:false});
+    const opts=((r&&r.options)||[]).filter(o=>o&&o.titleJa).slice(0,3);if(!opts.length)throw{code:'invalid_json'};
+    box.innerHTML='';const lim={titleJa:40,descJa:160,titleEn:40,descEn:160},lab={titleJa:'タイトル(日本語)',descJa:'説明文(日本語)',titleEn:'タイトル(英語)',descEn:'説明文(英語)'};
+    opts.forEach((o,i)=>{const c=document.createElement('div');c.className='metacard';const h=document.createElement('h4');h.textContent=`案${i+1}`;c.appendChild(h);
+      Object.keys(lim).forEach(k=>{const v=String(o[k]||'');const n=[...v].length;const kk=document.createElement('span');kk.className='k';kk.textContent=`${lab[k]} ${n}/${lim[k]}${n>lim[k]?'(長いので切ります)':''}`;const vv=document.createElement('div');vv.className='v';vv.textContent=v;c.append(kk,vv)});
+      const u=document.createElement('button');u.type='button';u.className='btn primary';u.textContent='この案を使う';u.onclick=()=>{Object.keys(lim).forEach(k=>S.meta[k]=[...String(o[k]||'')].slice(0,lim[k]).join(''));save();renderApply();renderRail();toast(`案${i+1}を入れました`);$('#metaFields').scrollIntoView({block:'start'})};c.appendChild(u);box.appendChild(c)})}
+  catch(e){box.innerHTML='';const p=document.createElement('p');p.className='warnline';p.textContent=sErr(e);box.appendChild(p)}finally{b.disabled=false}});
+$('#genPhrases').addEventListener('click',async()=>{if(!SAMPLE)return;const b=$('#genPhrases'),msg=$('#genPhrasesMsg');b.disabled=true;msg.hidden=false;msg.style.color='var(--muted)';msg.textContent='Claudeが考えています…';
+  try{const N=maxN();const r=await SAMPLE.json(phraseBase(moodText(),N)+`\n\n【出力形式】次のJSONだけを返す(説明は不要)。itemsはちょうど${S.count}個:{"items":[{"t":"決めゼリフ","p":"ポーズ・表情","s":"前置き(なければ空文字)"}]}`,{cache:false,onText:({text})=>{const n=(text.match(/"t"\s*:/g)||[]).length;msg.textContent=`Claudeが考えています… ${n}/${S.count}個`}});
+    const items=((r&&r.items)||[]).filter(x=>x&&x.t).slice(0,S.count);if(!items.length)throw{code:'invalid_json'};
+    items.forEach((x,i)=>{const sub=String(x.s||'').trim();S.phrases[i]={t:String(x.t).trim(),p:String(x.p||'').trim(),s2:sub?{t:sub,pos:'tc',k:0.7}:null}});
+    const lg=Math.max(...S.phrases.slice(0,S.count).map(p=>Math.max([...(p.t||'')].length,p.s2?[...p.s2.t].length:0)));S.txt.maxChars=Math.min(10,Math.max(5,lg));
+    save();await ensureFonts();renderDraft();msg.hidden=true;toast(`${items.length}個のセリフを入れました${items.length<S.count?`(残り${S.count-items.length}個は今のまま)`:''}`,4000)}
+  catch(e){msg.style.color='';msg.textContent=sErr(e)}finally{b.disabled=false}});
+async function getDL(){try{if(window.claude&&window.claude.use)return await window.claude.use('downloads')}catch(e){}return null}
+async function saveFile(name,blob){
+  const dl=await getDL();
+  if(dl){try{await dl.save({filename:name,data:blob});toast(/iPhone|iPad/.test(navigator.userAgent)?'保存しました。iPhoneは「ファイル」アプリ →「ダウンロード」に入っています':'保存しました',5000)}catch(e){toast(e&&e.code==='declined'?'保存をキャンセルしました':'保存できませんでした('+(e&&e.code||'エラー')+')')}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function makeZip(files){const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  for(const f of files){const name=enc.encode(f.name),data=f.data,crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,name.length,true);
+    parts.push(h.buffer,name,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);
+    central.push(c.buffer,name);off+=30+name.length+data.length}
+  const csize=central.reduce((a,b)=>a+b.byteLength,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,e.buffer],{type:'application/zip'})}
+const toBytes=async c=>new Uint8Array(await (await toBlob(c)).arrayBuffer());
+$('#zipBtn').addEventListener('click',async()=>{
+  busy(true,'ZIPを作っています…');await tick();let blob=null;
+  try{await ensureFonts();const files=[];for(let i=0;i<S.count;i++)files.push({name:pad(i+1)+'.png',data:await toBytes(renderSt(i))});
+    files.push({name:'main.png',data:await toBytes(renderSt(S.mainIdx,240,240,8,false))});files.push({name:'tab.png',data:await toBytes(renderSt(S.tabIdx,96,74,2,false))});blob=makeZip(files)}
+  catch(err){toast('ZIPを作れませんでした')}finally{busy(false)}
+  if(blob)await saveFile(`line_stamp_${S.count}.zip`,blob);
+});
+$('#sheetBtn').addEventListener('click',async()=>{
+  const cols=Math.min(8,S.count),rows=Math.ceil(S.count/cols),tw=185,th=160;const c=mk(cols*tw,rows*th),x=ctx(c);
+  for(let y=0;y<c.height;y+=16)for(let X=0;X<c.width;X+=16){x.fillStyle=((X+y)/16)%2?'#E3E7EC':'#FFFFFF';x.fillRect(X,y,16,16)}
+  for(let i=0;i<S.count;i++)x.drawImage(renderSt(i),(i%cols)*tw,Math.floor(i/cols)*th,tw,th);
+  await saveFile('preview.png',await toBlob(c));
+});
+
+/* ---------- guide samples ---------- */
+function drawCat(x,cx,cy,r,v){
+  x.save();x.lineJoin='round';x.lineCap='round';const lw=Math.max(2,r*0.08);x.lineWidth=lw;x.strokeStyle='#2A2A2A';
+  const ear=(s)=>{x.beginPath();x.moveTo(cx+s*r*0.75,cy-r*0.45);x.lineTo(cx+s*r*0.62,cy-r*1.05);x.lineTo(cx+s*r*0.2,cy-r*0.78);x.closePath();x.fillStyle='#FFFFFF';x.fill();x.stroke()};ear(-1);ear(1);
+  x.beginPath();x.ellipse(cx,cy,r,r*0.86,0,0,Math.PI*2);x.fillStyle='#FFFFFF';x.fill();x.stroke();
+  x.fillStyle='#F7A9BC';x.beginPath();x.ellipse(cx-r*0.55,cy+r*0.2,r*0.16,r*0.1,0,0,Math.PI*2);x.ellipse(cx+r*0.55,cy+r*0.2,r*0.16,r*0.1,0,0,Math.PI*2);x.fill();
+  x.fillStyle='#2A2A2A';const ey=cy-r*0.08,ex=r*0.33;
+  if(v%4===0){x.beginPath();x.arc(cx-ex,ey,r*0.08,0,Math.PI*2);x.arc(cx+ex,ey,r*0.08,0,Math.PI*2);x.fill()}
+  else if(v%4===1){x.beginPath();x.arc(cx-ex,ey+r*0.05,r*0.12,Math.PI*1.1,Math.PI*1.9);x.stroke();x.beginPath();x.arc(cx+ex,ey+r*0.05,r*0.12,Math.PI*1.1,Math.PI*1.9);x.stroke()}
+  else if(v%4===2){x.beginPath();x.moveTo(cx-ex-r*0.1,ey-r*0.08);x.lineTo(cx-ex+r*0.08,ey);x.lineTo(cx-ex-r*0.1,ey+r*0.08);x.moveTo(cx+ex+r*0.1,ey-r*0.08);x.lineTo(cx+ex-r*0.08,ey);x.lineTo(cx+ex+r*0.1,ey+r*0.08);x.stroke()}
+  else{x.beginPath();x.moveTo(cx-ex-r*0.1,ey);x.lineTo(cx-ex+r*0.1,ey);x.moveTo(cx+ex-r*0.1,ey);x.lineTo(cx+ex+r*0.1,ey);x.stroke()}
+  x.beginPath();x.moveTo(cx-r*0.12,cy+r*0.18);x.quadraticCurveTo(cx-r*0.06,cy+r*0.28,cx,cy+r*0.18);x.quadraticCurveTo(cx+r*0.06,cy+r*0.28,cx+r*0.12,cy+r*0.18);x.stroke();
+  if(v%2===0){x.beginPath();x.arc(cx+r*0.95,cy-r*0.35-(v%3)*r*0.1,r*0.2,0,Math.PI*2);x.fillStyle='#FFFFFF';x.fill();x.stroke()}
+  if(v===3||v===6){x.beginPath();x.arc(cx-r*0.95,cy-r*0.3,r*0.2,0,Math.PI*2);x.fillStyle='#FFFFFF';x.fill();x.stroke()}
+  x.restore();
+}
+function checkerBg(x,w,h,s=12){for(let y=0;y<h;y+=s)for(let X=0;X<w;X+=s){x.fillStyle=((X+y)/s)%2?'#E3E7EC':'#FFFFFF';x.fillRect(X,y,s,s)}}
+function sampleSticker(v,text,ts,w=W,h=H,{over=false,check=true}={}){
+  const c=mk(w,h),x=ctx(c);if(check)checkerBg(x,w,h);
+  let rect={x:M,y:M,w:w-2*M,h:h-2*M},L=null;
+  if(text){L=layoutText(x,text,ts,w,h,M);const [cc,r]=POS[ts.pos];if(ts.dir==='h'){if(r===0)rect.y+=L.th,rect.h-=L.th;else if(r===2)rect.h-=L.th}else{if(cc===0)rect.x+=L.tw,rect.w-=L.tw;else if(cc===2)rect.w-=L.tw}}
+  const rr=over?h*0.62:Math.min(rect.w,rect.h)*0.4;drawCat(x,rect.x+rect.w/2,rect.y+rect.h/2+rr*0.12,rr,v);
+  if(text)drawText(x,text,ts,L,ts.pos,w,h,M);
+  if(over||check){x.save();x.setLineDash([6,5]);x.strokeStyle='rgba(214,58,90,.85)';x.lineWidth=2;x.strokeRect(M,M,w-2*M,h-2*M);x.restore()}
+  return c;
+}
+let guideDrawn=false;
+async function drawGuide(){
+  if(guideDrawn)return;guideDrawn=true;
+  try{if(document.fonts)await Promise.all(['zenmaru','hachi','yusei','dela'].map(k=>{const f=fontOf(k);return document.fonts.load(`${f.w} 40px "${f.f}"`,'おはようありがとう了解!またね').catch(()=>{})}))}catch(e){}
+  const g2=$('#gx2');g2.innerHTML='';
+  [[0,'おはよう',{...defTxt(),pos:'bc'},'下・横書き'],[1,'ありがとう',{...defTxt(),pos:'mr',dir:'v',font:'yusei',color:'#D63A5A'},'右・縦書き'],[2,'了解!',{...defTxt(),pos:'tc',font:'dela',color:'#2F6FDB'},'上・極太']].forEach(([v,t,ts,cap])=>{const f=document.createElement('figure');f.style.cssText='margin:0;min-width:0;display:grid;gap:4px';const c=sampleSticker(v,t,ts);c.style.width='100%';f.appendChild(c);const fc=document.createElement('figcaption');fc.className='small muted';fc.textContent=cap;f.appendChild(fc);g2.appendChild(f)});
+  const g3=$('#gx3');g3.innerHTML='';const sh=mk(640,360),sx=ctx(sh);sx.fillStyle='#00FF00';sx.fillRect(0,0,640,360);for(let i=0;i<8;i++)drawCat(sx,80+(i%4)*160,95+Math.floor(i/4)*175,52,i);sh.style.maxWidth='100%';
+  const ar=document.createElement('span');ar.className='arrow';ar.textContent='→';
+  const res=mk(640,360),rx=ctx(res);checkerBg(rx,640,360,16);for(let i=0;i<8;i++){const cx=80+(i%4)*160,cy=95+Math.floor(i/4)*175;drawCat(rx,cx,cy,52,i);rx.save();rx.setLineDash([5,4]);rx.strokeStyle='rgba(214,58,90,.7)';rx.strokeRect(cx-74,cy-80,148,160);rx.restore()}
+  g3.append(sh,ar,res);
+  const g4=$('#gx4');g4.innerHTML='';const b=sampleSticker(4,'またね',{...defTxt(),pos:'bc'},W,H,{over:true});const bx=ctx(b);bx.fillStyle='#FCEFD9';bx.fillRect(W-86,6,78,30);bx.fillStyle='#9A5800';bx.font='700 18px sans-serif';bx.textAlign='center';bx.textBaseline='middle';bx.fillText('余白',W-47,21);
+  const a2=document.createElement('span');a2.className='arrow';a2.textContent='→';g4.append(b,a2,sampleSticker(4,'またね',{...defTxt(),pos:'bc'}));
+  const g5=$('#gx5');g5.innerHTML='';const tk=mk(400,300),tx=ctx(tk);tx.fillStyle='#8098BB';tx.fillRect(0,0,400,300);tx.fillStyle='#FFFFFF';tx.beginPath();tx.roundRect?tx.roundRect(56,24,190,40,18):tx.rect(56,24,190,40);tx.fill();tx.fillStyle='#E2E9E7';tx.beginPath();tx.arc(30,44,16,0,Math.PI*2);tx.fill();
+  tx.fillStyle='#1C2629';tx.font='16px sans-serif';tx.textBaseline='middle';tx.fillText('明日10時に駅前ね!',72,44);const st=sampleSticker(1,'了解!',{...defTxt(),pos:'bc'},W,H,{check:false});tx.drawImage(st,180,100,200,173);tk.style.maxWidth='400px';g5.appendChild(tk);
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  let st=null;
+  try{INDEX=(await DB.get('index'))||[];const cur=await DB.get('cur');
+    if(!INDEX.length){const legacy=await DB.get('project');if(legacy){st=legacy}}
+    else{const id=INDEX.find(x=>x.id===cur)?cur:INDEX[0].id;st=await DB.get('p:'+id)}}catch(e){}
+  await loadState(st||defaults());
+  if(!INDEX.find(x=>x.id===S.id))INDEX.push({id:S.id,name:S.name,updated:Date.now()});
+  try{await DB.set('index',INDEX)}catch(e){}
+  go(S.step||1);
+}
+renderSetup();go(1);boot();
+})();
+</script>
+
+</body>
+</html>
