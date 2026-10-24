@@ -134,6 +134,11 @@ button.slot:hover{border-color:var(--accent)}
 .presets button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .prompt-edit{min-height:280px;font-size:15px;line-height:1.6;margin-top:8px}
 .pbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer;min-height:38px}
+.chips button:hover{border-color:var(--accent)}
+.profbox{display:grid;gap:8px;border:1px dashed var(--line);border-radius:12px;padding:12px}
 .metacards{display:grid;gap:10px}
 .metacard{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--bg)}
 .metacard .k{font-size:13px;font-weight:700;color:var(--muted)}
@@ -459,8 +464,9 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
       <li>「AIの使用」で<b>AIを使用しています</b>を選択</li>
       <li>ZIPをアップロード → 個数と中身を確認してリクエスト</li>
     </ol>
-    <div class="btns"><a class="btn dark" href="https://creator.line.me/ja/" target="_blank" rel="noopener">LINE Creators Marketを開く ↗</a></div>
     <div class="checks" id="checks"></div>
+    <div class="btns"><a class="btn dark" id="lineBtn" href="https://creator.line.me/ja/" target="_blank" rel="noopener">LINE Creators Marketを開く ↗</a></div>
+    <p class="small" id="lineNote"></p>
     <p class="small muted">規格や審査のルールは変わることがあります。申請の直前に公式の制作ガイドラインも確認してください。</p>
   </div>
 </section>
@@ -952,7 +958,7 @@ $('#refFile').addEventListener('change',e=>{const f=e.target.files[0];e.target.v
 $('#refFile2').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)loadRefFile(f)});
 $('#refClear').addEventListener('click',()=>{S.ref=null;refImg=null;save();renderRef()});
 $('#projSel').addEventListener('change',async e=>{await saveNow();busy(true,'セットを開いています…');try{const st=await DB.get('p:'+e.target.value);if(st){await loadState(st);await saveNow();go(1)}}finally{busy(false)}});
-$('#projNew').addEventListener('click',async()=>{await saveNow();const n=defaults();n.name=`スタンプ${INDEX.length+1}`;n.provider=S.provider;n.customName=S.customName;n.customUrl=S.customUrl;await loadState(n);await saveNow();go(1);toast('新しいセットを作りました')});
+$('#projNew').addEventListener('click',async()=>{await saveNow();const n=defaults();n.name=`スタンプ${INDEX.length+1}`;n.provider=S.provider;n.customName=S.customName;n.customUrl=S.customUrl;const pr=PROF.list.find(x=>x.id===PROF.last);if(pr){n.meta.creator=pr.creator;n.meta.copyright=pr.copyright}await loadState(n);await saveNow();go(1);toast('新しいセットを作りました')});
 $('#projDup').addEventListener('click',async()=>{await saveNow();const c=JSON.parse(JSON.stringify(S));c.id=newId();c.name=S.name+'(コピー)';c.sheetSaved={};await loadState(c);await saveNow();go(1);toast('複製しました')});
 const DEL_BTN='<button class="btn danger" type="button" id="projDel">このセットを削除</button>';
 $('#projDelArea').addEventListener('click',async e=>{const a=$('#projDelArea'),id=e.target.id;
@@ -1212,7 +1218,9 @@ async function runAudit(){
   ul.innerHTML='';items.forEach(([ok,t,fix])=>{const li=document.createElement('li');li.className=ok?'ok':'ng';li.innerHTML=`<span class="ic">${ok?'✓':'!'}</span><span class="t"></span>`;li.querySelector('.t').textContent=t;
     if(!ok&&!(fix[0]===6)){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent='直す';b.onclick=()=>{go(fix[0]);if(fix[0]===4&&fix[1]!=null)openEd(fix[1])};li.appendChild(b)}ul.appendChild(li)});
 }
+function updLineBtn(){const all=CHECKS.every((_,k)=>S.checks[k]);const b=$('#lineBtn');if(all)b.removeAttribute('aria-disabled');else b.setAttribute('aria-disabled','true');$('#lineNote').textContent=all?'準備OKです。ZIPとコピーした文章を使って申請してください。':`上の${CHECKS.length}項目を全部チェックすると押せます。`;$('#lineNote').className='small '+(all?'':'muted')}
 function renderApply(){
+  if(!S.meta.creator&&!S.meta.copyright&&PROF.last){const pr=PROF.list.find(x=>x.id===PROF.last);if(pr){S.meta.creator=pr.creator;S.meta.copyright=pr.copyright;save()}}
   const f=filled();$('#zipLast').textContent=pad(S.count);$('#zipState').textContent=`${f}/${S.count} 個`;$('#zipState').className='pill '+(f===S.count?'ok':'warn');$('#zipBtn').disabled=f<S.count;
   const box=$('#metaFields');box.innerHTML='';
   META.forEach(([k,label,max,multi])=>{const id='meta-'+k;const row=document.createElement('label');row.className='f';
@@ -1220,7 +1228,8 @@ function renderApply(){
     box.appendChild(row);const inp=row.querySelector('#'+id),cnt=row.querySelector('.count');inp.value=S.meta[k]||'';
     const upd=()=>{const n=[...inp.value].length;cnt.textContent=`${n}/${max}`;cnt.classList.toggle('over',n>max)};upd();
     inp.addEventListener('input',()=>{S.meta[k]=inp.value;save();upd();renderRail()});row.querySelector('button').addEventListener('click',()=>copyText(inp.value))});
-  const ch=$('#checks');ch.innerHTML='';CHECKS.forEach((t,k)=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" id="chk-${k}"><span></span>`;l.querySelector('span').textContent=t;const c=l.querySelector('input');c.checked=!!S.checks[k];c.addEventListener('change',()=>{S.checks[k]=c.checked;save()});ch.appendChild(l)});
+  const ch=$('#checks');ch.innerHTML='';CHECKS.forEach((t,k)=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" id="chk-${k}"><span></span>`;l.querySelector('span').textContent=t;const c=l.querySelector('input');c.checked=!!S.checks[k];c.addEventListener('change',()=>{S.checks[k]=c.checked;save();updLineBtn()});ch.appendChild(l)});updLineBtn();
+  mountProfiles();mountTitleAlt();
   runAudit();
 }
 $('#auditRun').addEventListener('click',runAudit);
@@ -1237,6 +1246,45 @@ function metaBase(){const ex=S.phrases.slice(0,Math.min(S.count,12)).map(p=>(p.s
   return `LINEスタンプのストアに載せる「タイトル」と「説明文」を、日本語と英語で3案ずつ考えてください。\n\n【スタンプの内容】\nキャラの名前:${charNameOf()}\nキャラの見た目:${S.theme||'(未入力)'}\nセリフの種類:${(TPL[S.tpl]||TPL.daily).n}\nセリフの例:${ex}\n個数:${S.count}個\n\n【条件】\n・日本語タイトル:40文字以内(キャラの名前を入れる)\n・日本語説明文:160文字以内(キャラの魅力と、どんな場面で使えるかを入れる)\n・英語タイトル:40文字以内(半角)\n・英語説明文:160文字以内(半角)\n・絵文字・記号の多用はしない。「最高」「No.1」などの言い過ぎた表現は使わない\n・実在の会社名・商品名・有名キャラクター名は入れない`}
 $('#copyMetaPrompt').addEventListener('click',()=>copyText(metaPrompt()));
 $('#copyEnPrompt').addEventListener('click',()=>copyText(`次のLINEスタンプのタイトルと説明文を、自然な英語に訳してください。タイトルは40文字以内、説明文は160文字以内。絵文字は使わない。\n\nタイトル:${S.meta.titleJa||'(未入力)'}\n説明文:${S.meta.descJa||'(未入力)'}`));
+/* ---------- creator profiles ---------- */
+let PROF={list:[],last:null};
+async function loadProf(){try{const v=await DB.get('profiles');if(v&&v.list)PROF=v}catch(e){}}
+function saveProf(){try{DB.set('profiles',JSON.parse(JSON.stringify(PROF))).catch(()=>{})}catch(e){}}
+function mountProfiles(){
+  const cr=$('#meta-creator');if(!cr)return;const row=cr.closest('label.f');let box=$('#profBox');if(box)box.remove();
+  box=document.createElement('div');box.id='profBox';box.className='profbox';
+  box.innerHTML=`<span class="small" style="font-weight:700">保存したクリエイター情報(全部のセットで共通)</span>
+    <select id="profSel" aria-label="保存したクリエイター情報"></select>
+    <div class="btns"><button class="btn" type="button" id="profSave">この内容を保存</button><button class="btn" type="button" id="profNew">新しく追加</button><button class="btn ghost" type="button" id="profDel">削除</button></div><div id="profMsg"></div>`;
+  row.parentNode.insertBefore(box,row);
+  const sel=$('#profSel');const cur=PROF.list.find(x=>x.creator===S.meta.creator&&x.copyright===S.meta.copyright);
+  sel.innerHTML=`<option value="">${PROF.list.length?'(選んでください)':'(まだ保存がありません)'}</option>`+PROF.list.map(x=>`<option value="${x.id}">${esc(x.creator||'(名前なし)')} / ${esc(x.copyright||'')}</option>`).join('');
+  sel.value=cur?cur.id:'';$('#profDel').hidden=!cur;
+  const setF=(c,cp)=>{S.meta.creator=c;S.meta.copyright=cp;save();$('#meta-creator').value=c;$('#meta-copyright').value=cp;$('#meta-creator').dispatchEvent(new Event('input'));$('#meta-copyright').dispatchEvent(new Event('input'))};
+  sel.onchange=()=>{const pr=PROF.list.find(x=>x.id===sel.value);if(pr){PROF.last=pr.id;saveProf();setF(pr.creator,pr.copyright);$('#profDel').hidden=false;toast('クリエイター情報を入れました')}};
+  $('#profSave').onclick=()=>{const c=(S.meta.creator||'').trim(),cp=(S.meta.copyright||'').trim();if(!c&&!cp){toast('クリエイター名かコピーライトを入れてから保存してください');return}
+    let pr=PROF.list.find(x=>x.id===sel.value);if(pr){pr.creator=c;pr.copyright=cp}else{pr={id:newId(),creator:c,copyright:cp};PROF.list.push(pr)}PROF.last=pr.id;saveProf();mountProfiles();toast('保存しました。次のセットからは自動で入ります')};
+  $('#profNew').onclick=()=>{sel.value='';setF('','');$('#profDel').hidden=true;$('#meta-creator').focus();toast('新しい名前を入れて「この内容を保存」を押してください',4000)};
+  $('#profDel').onclick=()=>{$('#profMsg').innerHTML=`<div class="confirm">この保存内容を削除します。<button class="btn danger" type="button" id="profDelYes">削除する</button><button class="btn ghost" type="button" id="profDelNo">やめる</button></div>`;
+    $('#profDelNo').onclick=()=>$('#profMsg').innerHTML='';$('#profDelYes').onclick=()=>{PROF.list=PROF.list.filter(x=>x.id!==sel.value);if(PROF.last===sel.value)PROF.last=PROF.list[0]?.id||null;saveProf();mountProfiles();toast('削除しました')}};
+}
+/* ---------- english title alternatives ---------- */
+let altOff=0;
+function altLocal(){const cur=(S.meta.titleEn||'').trim();let b=cur.replace(/\s*(Stickers?|Sticker Pack)$/i,'').replace(/['’]s .*$/,'').replace(/\s+(Daily|Vol\.\s*\d+|Talk|Life|Mood|Friends)$/i,'').trim();if(!b)b=(/^[ -~]+$/.test(charNameOf())?charNameOf():'Cute Character');
+  const cr=(S.meta.creator||'').trim();const pats=[`${b} Stickers`,`${b} Daily`,`${b}'s Daily Chat`,`${b} Everyday Talk`,`Hello! ${b}`,`${b} Vol.1`,`Little ${b}`,`${b} Friends`,`Happy ${b}`,`${b} Mood`,`${b} Says Hi`,`My Dear ${b}`,`${b} Life`,`${b} & Friends`,`${b} Vol.2`,`Lovely ${b}`,`${b} Chat Pack`,`${b} Every Day`];if(cr&&/^[ -~]+$/.test(cr))pats.push(`${b} by ${cr}`);
+  const ok=[...new Set(pats)].filter(x=>x.length<=40&&x!==cur);const out=[];for(let i=0;i<5&&ok.length;i++)out.push(ok[(altOff+i)%ok.length]);altOff+=5;return out}
+function mountTitleAlt(){const inp=$('#meta-titleEn');if(!inp)return;const row=inp.closest('label.f');let box=$('#altBox');if(box)box.remove();
+  box=document.createElement('div');box.id='altBox';box.style.cssText='display:grid;gap:8px';
+  box.innerHTML=`<div class="btns"><button class="btn" type="button" id="altBtn">英語タイトルの別の候補を出す</button></div><p class="small muted">「登録済み」などで使えないときに押してください。候補をタップすると入ります。</p><div class="chips" id="altChips"></div>`;
+  row.parentNode.insertBefore(box,row.nextSibling);
+  const show=list=>{const c=$('#altChips');c.innerHTML='';list.forEach(t=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.onclick=()=>{S.meta.titleEn=[...t].slice(0,40).join('');save();inp.value=S.meta.titleEn;inp.dispatchEvent(new Event('input'));toast('英語タイトルを入れました')};c.appendChild(b)})};
+  $('#altBtn').onclick=async()=>{const b=$('#altBtn');if(!SAMPLE){show(altLocal());return}
+    b.disabled=true;$('#altChips').innerHTML='<span class="small muted">Claudeが考えています…</span>';
+    try{const shown=[...$$('#altChips button')].map(x=>x.textContent);const r=await SAMPLE.json(`LINEスタンプの英語タイトルの候補を5つ考えてください。すでに使われているタイトルと重ならないよう、言い回しを変えた独自性のあるものにしてください。\nキャラの名前:${charNameOf()}\nキャラの見た目:${S.theme||''}\n今のタイトル(使えなかったもの):${S.meta.titleEn||'(なし)'}\n条件:半角英数字と記号のみ、40文字以内、絵文字なし、実在の商品名・有名キャラ名は入れない。\n次のJSONだけを返す:{"titles":["","","","",""]}`,{cache:false});
+      const list=((r&&r.titles)||[]).map(x=>String(x).trim()).filter(x=>x&&x.length<=40&&/^[ -~]+$/.test(x));show(list.length?list:altLocal())}
+    catch(e){show(altLocal())}finally{b.disabled=false}};
+}
+
 /* ---------- Claude (sample) ---------- */
 let SAMPLE=null;
 function updSampleUI(){$$('[data-needs-sample]').forEach(el=>el.hidden=!SAMPLE);$$('[data-no-sample]').forEach(el=>el.hidden=!!SAMPLE);$$('details > summary').forEach(sm=>{if(/^予備:Geminiで作る/.test(sm.textContent)&&!SAMPLE){sm.textContent='Geminiで作る';sm.parentElement.open=true}})}
@@ -1332,7 +1380,7 @@ async function drawGuide(){
 
 /* ---------- boot ---------- */
 async function boot(){
-  let st=null;
+  let st=null;await loadProf();
   try{INDEX=(await DB.get('index'))||[];const cur=await DB.get('cur');
     if(!INDEX.length){const legacy=await DB.get('project');if(legacy){st=legacy}}
     else{const id=INDEX.find(x=>x.id===cur)?cur:INDEX[0].id;st=await DB.get('p:'+id)}}catch(e){}
