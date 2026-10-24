@@ -858,6 +858,12 @@ function drawDeco(x,kind,b,fs,w,h,m){if(!kind||kind==='none')return;const s=Math
   else if(kind==='sweat'){drop(...L1,s*0.8);drop(L1[0]+s*0.9,L1[1]-s*0.5,s*0.55)}
   else if(kind==='zzz'){zee(...R1,s*0.85);zee(R1[0]+s*0.9>w-m-s?R1[0]-s*0.9:R1[0]+s*0.9,cl(R1[1]-s*1.2,m+s,h-m-s),s*0.65);}
   else if(kind==='note'){note(...R1,s);note(...L1,s*0.7)}}
+function fitInside(c,mm){const w=c.width,h=c.height,d=ctx(c).getImageData(0,0,w,h).data;let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++){const r=y*w*4;for(let x=0;x<w;x++)if(d[r+x*4+3]>16){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+  if(x1<0||(x0>=mm&&y0>=mm&&x1<=w-1-mm&&y1<=h-1-mm))return c;
+  const bw=x1-x0+1,bh=y1-y0+1;const s=Math.min(1,(w-2*mm)/bw,(h-2*mm)/bh);const nw=bw*s,nh=bh*s;
+  let nx=(x0+x1)/2-nw/2,ny=(y0+y1)/2-nh/2;nx=Math.max(mm,Math.min(w-mm-nw,nx));ny=Math.max(mm,Math.min(h-mm-nh,ny));
+  const o=mk(w,h),ox=ctx(o);ox.imageSmoothingEnabled=true;ox.imageSmoothingQuality='high';ox.drawImage(c,x0,y0,bw,bh,nx,ny,nw,nh);return o}
 function addBorder(c,bw){const w=c.width,h=c.height;const t=mk(w,h),tx=ctx(t);const n=24;for(let k=0;k<n;k++){const a=k/n*Math.PI*2;tx.drawImage(c,Math.cos(a)*bw,Math.sin(a)*bw)}
   tx.globalCompositeOperation='source-in';tx.fillStyle='#FFFFFF';tx.fillRect(0,0,w,h);tx.globalCompositeOperation='source-over';tx.drawImage(c,0,0);return t}
 function renderSt(i,w=W,h=H,m=M,withText=true,ghost=false){
@@ -871,6 +877,7 @@ function renderSt(i,w=W,h=H,m=M,withText=true,ghost=false){
   if(withText&&textOn(i)&&ts.deco&&ts.deco!=='none'){const kind=ts.deco==='auto'?decoAuto((lay.ph.t||'')+' '+(lay.ph.p||'')):ts.deco;
     const b=box||(src?(()=>{const g=imgGeom(src,ok?st:null,lay.rect,w,h);return{x0:g.px,y0:g.py,x1:g.px+g.dw,y1:g.py+g.dh}})():null);
     if(b)drawDeco(x,kind,b,lay.L?lay.L.fs:h*0.15,w,h,mm)}
+  if(ok)c=fitInside(c,mm);
   const bw=borderW(ts,h);if(bw&&ok)c=addBorder(c,bw);
   return c;
 }
