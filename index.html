@@ -310,6 +310,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
       <div style="display:grid;gap:10px;min-width:0;flex:1">
         <p class="small muted">手持ちのキャラ画像があれば入れてください。下書きに表示され、指示文も「添付画像と同じキャラで」に変わります。AIアプリにも同じ画像を添付してください。</p>
         <div class="btns"><label class="btn">画像を選ぶ<input type="file" id="refFile" accept="image/*"></label><button class="btn ghost" type="button" id="refClear">見本を外す</button></div>
+        <div class="btns" id="refMakeBtn"><button class="btn primary" type="button" data-go="3">見本がない場合 → STEP 3で作る</button></div>
       </div>
     </div>
   </div>
@@ -375,9 +376,10 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
     <div class="progress"><i id="genBar"></i></div>
   </div>
   <div class="card" id="charCard">
-    <h3>はじめに:キャラの見本を作る(見本画像がない場合)</h3>
-    <p class="small muted">先にキャラを1体作り、気に入ったら保存してSTEP 1で見本画像として読み込みます。絵柄がそろいやすくなります。</p>
-    <div class="btns"><button class="btn dark" type="button" id="copyChar">見本の指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a></div>
+    <div class="row"><h3>はじめに:キャラの見本を作る</h3><span class="pill" id="refState">見本なし</span></div>
+    <p class="small muted">見本画像がない場合は、ここでキャラを1体作ります。①指示文をコピー → ②AIに貼って生成 → ③気に入ったら保存して「できた見本を読み込む」。見本があると、40個の絵柄がそろいやすくなります。</p>
+    <div class="ref-box"><div class="ref-thumb" id="refThumb2" style="width:96px">見本なし</div>
+      <div class="btns" style="flex:1;min-width:0"><button class="btn dark" type="button" id="copyChar">① 見本の指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>② AIを開く ↗</a><label class="btn primary">③ できた見本を読み込む<input type="file" id="refFile2" accept="image/*"></label></div></div>
     <details><summary>指示文を見る・書き換える</summary><div id="charPrompt"></div></details>
   </div>
   <div id="sheets" style="display:grid;gap:14px"></div>
@@ -480,7 +482,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
   </article>
   <article>
     <h3><span class="gnum">3</span>AIで生成</h3>
-    <ul><li>「指示文をコピー」→「AIを開く」→ 見本画像を添付して貼り付け → 送信</li><li>指示文は「指示文を見る・書き換える」で一部だけ直せます。直した内容がコピーされ、「元に戻す」で自動作成の状態に戻ります</li><li>できた画像を保存し、「できた画像を読み込む」で選びます</li><li>読み込むと、自動で切り分け・背景の透明化・サイズ調整をします</li><li>キャラ同士が近くて切り分けがずれたら「区切りを調整」で赤い線を動かします</li></ul>
+    <ul><li>見本画像がないときは、最初の「キャラの見本を作る」で1体作り、「できた見本を読み込む」で入れます(STEP 1に戻る必要はありません)</li><li>「指示文をコピー」→「AIを開く」→ 見本画像を添付して貼り付け → 送信。AIの画像はスクショではなく、長押し →「保存」で保存します(スクショの黒い帯は自動で切り落とします)</li><li>指示文は「指示文を見る・書き換える」で一部だけ直せます。直した内容がコピーされ、「元に戻す」で自動作成の状態に戻ります</li><li>できた画像を保存し、「できた画像を読み込む」で選びます</li><li>読み込むと、自動で切り分け・背景の透明化・サイズ調整をします</li><li>キャラ同士が近くて切り分けがずれたら「区切りを調整」で赤い線を動かします</li></ul>
     <div class="ex"><span class="lab">参考例:AIが作る画像(緑背景)→ 読み込み後</span><div class="ex-row" id="gx3"></div></div>
     <div class="ex"><span class="lab">参考例:指示文の一部</span><pre class="prompt" style="margin:0">添付した画像のキャラクターと同じキャラで、LINEスタンプ用のイラストを8個、1枚の画像にまとめて描いてください。
 【画像の縦横比】16:9(横長)
@@ -508,7 +510,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
     <h3>つまずいたとき</h3>
     <div class="qa">
       <details><summary>緑色が残ってしまう</summary><p>STEP 4でそのスタンプを開き、「背景の消し具合」を右に動かして「背景を消し直す」。細かい所は消しゴムでなぞってください。</p></details>
-      <details><summary>キャラ同士がくっついて、うまく切り分けられない</summary><p>STEP 3の「区切りを調整」で赤い線を動かして切り分け直せます。重なっている場合は、AIに「もっとすき間を空けて」と頼むか、「1回の生成で作る数」を4個か1個ずつに変えてください。</p></details>
+      <details><summary>キャラ同士がくっついて、うまく切り分けられない</summary><p>STEP 3の各回のカードにある「くっついている・ずれているときは」を開いてください。まず「区切りを調整」で赤い線を動かして切り分け直せます。重なっているときは「すき間を広く空けて作り直す指示文」をAIに送ります。重なっている場合は、AIに「もっとすき間を空けて」と頼むか、「1回の生成で作る数」を4個か1個ずつに変えてください。</p></details>
       <details><summary>回ごとにキャラの絵柄が変わってしまう</summary><p>毎回、見本画像をAIに添付してから指示文を貼ってください。同じ会話の続きで頼むのも効果があります。</p></details>
       <details><summary>同じようなポーズばかりになる</summary><p>STEP 2でポーズの欄を具体的に書き換えてください(例:「手を振る」→「右手を大きく振ってジャンプ」)。かぶった1個は手直しで作り直せます。</p></details>
       <details><summary>ZIPが保存できない</summary><p>保存の確認が出たら許可してください。それでもだめなときは、ページを開き直してからもう一度押してください。</p></details>
@@ -753,6 +755,17 @@ function cleanTrim(c){
   if(Math.max(out.width,out.height)>mx){const k=mx/Math.max(out.width,out.height);const o2=mk(out.width*k,out.height*k);const x2=ctx(o2);x2.imageSmoothingQuality='high';x2.drawImage(out,0,0,o2.width,o2.height);out=o2}
   return out;
 }
+function trimBars(c){if(S.bg!=='green')return c;const w=c.width,h=c.height,d=ctx(c).getImageData(0,0,w,h).data;
+  const px=(x,y)=>{const o=(y*w+x)*4;return[d[o],d[o+1],d[o+2]]};
+  const bar=(get,n)=>{const mn=[255,255,255],mx=[0,0,0];const st=Math.max(1,Math.floor(n/80));for(let i=0;i<n;i+=st){const q=get(i);for(let k=0;k<3;k++){if(q[k]<mn[k])mn[k]=q[k];if(q[k]>mx[k])mx[k]=q[k]}}
+    if(!mx.every((v,k)=>v-mn[k]<28))return false;const a=[0,1,2].map(k=>(mx[k]+mn[k])/2);return !(a[1]>a[0]+40&&a[1]>a[2]+40)};
+  let t=0,b=h-1,l=0,r=w-1;
+  while(t<h*0.45&&bar(i=>px(i,t),w))t++;while(b>h*0.55&&bar(i=>px(i,b),w))b--;
+  while(l<w*0.45&&bar(i=>px(l,t+i),b-t))l++;while(r>w*0.55&&bar(i=>px(r,t+i),b-t))r--;
+  if(t<3&&l<3&&h-1-b<3&&w-1-r<3)return c;return crop(c,l,t,r-l+1,b-t+1)}
+function touchList(cells,from,to){const out=[];cells.forEach((c,j)=>{if(from+j>=to)return;const x=ctx(c.proc),w=c.proc.width,h=c.proc.height;if(w<6||h<6)return;
+  const cnt=(sx,sy,sw,sh)=>{const d=x.getImageData(sx,sy,sw,sh).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>60)n++;return n};
+  const lim=v=>Math.max(4,v*0.01);if(cnt(0,0,2,h)>lim(h)||cnt(w-2,0,2,h)>lim(h)||cnt(0,0,w,2)>lim(w)||cnt(0,h-2,w,2)>lim(w))out.push(from+j+1)});return out}
 function newSticker(i,rawC,procC){const old=S.stickers[i];S.stickers[i]={src:procC.toDataURL('image/png'),orig:rawC.toDataURL('image/png'),scale:1,dx:0,dy:0,tol:60,global:false,ts:old?old.ts:null};RT[i]={cv:procC,ver:++VER};DIRTY.add(i)}
 
 /* ---------- text + render ---------- */
@@ -877,6 +890,7 @@ function buildTc(root,getTs,onChange,sample,opts={}){
 function nextAction(){
   const f=filled();
   if(!S.theme)return[1,'STEP 1:キャラ・テーマを入力しましょう'];
+  if(!S.ref&&filled()===0&&!S.visited[3])return[3,'STEP 3:まずキャラの見本を作って読み込みましょう(手持ちの画像があればSTEP 1で読み込めます)'];
   if(!S.visited[2])return[2,'STEP 2:セリフ・ポーズと文字のデザインを決めましょう'];
   if(f<S.count){const p=per();for(let k=0;k<sheetCount();k++){const from=k*p.n,to=Math.min(S.count,from+p.n);for(let i=from;i<to;i++)if(!has(i))return[3,`STEP 3:${sheetCount()>1?`${k+1}回目(${pad(from+1)}〜${pad(to)}番)`:'画像'}をAIで作って読み込みましょう`]}}
   let bad=0;for(let i=0;i<S.count;i++){const is=issues(i);if(is.length)bad++}
@@ -920,7 +934,7 @@ $('#presets').addEventListener('click',e=>{const b=e.target.closest('[data-prese
 $('#presetConfirm').addEventListener('click',async e=>{const b=e.target.closest('[data-pa]');if(!b)return;const a=b.dataset.pa;$('#presetConfirm').innerHTML='';if(a==='no')return;const p=PRESETS[Number(b.dataset.i)];
   S.theme=p.theme;S.taste=p.taste;S.charName=p.nm;if(a==='all')applyTpl(p.tpl);save();await ensureFonts();renderSetup();renderRail();toast(a==='all'?`「${p.n}」を入れました(最大文字数:${S.txt.maxChars}文字)`:`「${p.n}」のテーマと絵柄を入れました`)});
 function applyTpl(k){S.tpl=k;S.phrases=tplPhrases(k);const lg=Math.max(...S.phrases.slice(0,S.count).map(p=>Math.max([...p.t].length,p.s2?[...p.s2.t].length:0)));const n=Math.min(10,Math.max(5,lg));S.txt.maxChars=n;S.stickers.forEach(st=>{if(st&&st.ts)st.ts.maxChars=n})}
-function renderRef(){const t=$('#refThumb');t.innerHTML=S.ref?`<img alt="見本画像" src="${S.ref}">`:'見本なし';$('#refClear').hidden=!S.ref}
+function renderRef(){const t2=$('#refThumb2');if(t2){t2.innerHTML=S.ref?`<img alt="見本画像" src="${S.ref}">`:'見本なし';$('#refState').textContent=S.ref?'✓ 見本あり':'見本なし';$('#refState').className='pill '+(S.ref?'ok':'')}$('#refMakeBtn').hidden=!!S.ref;const t=$('#refThumb');t.innerHTML=S.ref?`<img alt="見本画像" src="${S.ref}">`:'見本なし';$('#refClear').hidden=!S.ref}
 $$('input[name=prov]').forEach(r=>r.addEventListener('change',()=>{S.provider=r.value;save();renderSetup()}));
 [['customName','customName'],['customUrl','customUrl'],['theme','theme'],['charName','charName'],['style','style'],['userPrompt','userPrompt']].forEach(([id,k])=>$('#'+id).addEventListener('input',e=>{S[k]=e.target.value;if(k==='style'||k==='theme')$('#tastePreview').textContent=tasteBlock();if(k==='theme')themeHint();save();updateAiLinks();renderRail()}));
 $('#projName').addEventListener('input',e=>{S.name=e.target.value||'名前なし';save();renderRail();const o=$('#projSel').querySelector(`option[value="${S.id}"]`);if(o)o.textContent=S.name});
@@ -929,7 +943,9 @@ $('#layout').addEventListener('change',e=>{const v=e.target.value;if(filled()>0&
 $('#layoutConfirm').addEventListener('click',e=>{const b=e.target.closest('[data-lv]');if(!b)return;if(b.dataset.lv){S.layout=b.dataset.lv;$('#layout').value=S.layout;save();toast('作る数を変えました')}$('#layoutConfirm').innerHTML=''});
 $('#aspect').addEventListener('change',e=>{S.aspect=e.target.value;save()});
 $('#bg').addEventListener('change',e=>{S.bg=e.target.value;save()});
-$('#refFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const c=await fileToCanvas(f,700);S.ref=c.toDataURL('image/png');refImg=await loadImg(S.ref);save();renderRef();toast('見本画像を入れました')}catch(err){toast(err.message)}});
+async function loadRefFile(f){try{const c=await fileToCanvas(f,700);S.ref=c.toDataURL('image/png');refImg=await loadImg(S.ref);save();renderRef();renderRail();if(S.step===3)renderSheets();toast('見本画像を入れました。AIに指示文を送るときは、この画像も添付してください',4500)}catch(err){toast(err.message)}}
+$('#refFile').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)loadRefFile(f)});
+$('#refFile2').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)loadRefFile(f)});
 $('#refClear').addEventListener('click',()=>{S.ref=null;refImg=null;save();renderRef()});
 $('#projSel').addEventListener('change',async e=>{await saveNow();busy(true,'セットを開いています…');try{const st=await DB.get('p:'+e.target.value);if(st){await loadState(st);await saveNow();go(1)}}finally{busy(false)}});
 $('#projNew').addEventListener('click',async()=>{await saveNow();const n=defaults();n.name=`スタンプ${INDEX.length+1}`;n.provider=S.provider;n.customName=S.customName;n.customUrl=S.customUrl;await loadState(n);await saveNow();go(1);toast('新しいセットを作りました')});
@@ -1005,7 +1021,7 @@ $('#tplConfirm').addEventListener('click',async e=>{if(e.target.id==='tplNo')$('
 
 /* ---------- step 3 ---------- */
 function renderSheets(){
-  mountPrompt($('#charPrompt'),'char',charPrompt);$('#charCard').hidden=!!S.ref&&filled()>0;
+  mountPrompt($('#charPrompt'),'char',charPrompt);renderRef();
   const f=filled();$('#genCount').textContent=`${f}/${S.count} 個`;$('#genCount').className='pill '+(f===S.count?'ok':'');$('#genBar').style.width=(f/S.count*100)+'%';
   const box=$('#sheets');box.innerHTML='';const p=per();
   for(let k=0;k<sheetCount();k++){
@@ -1015,6 +1031,11 @@ function renderSheets(){
       <p class="list"></p><div class="thumbs"></div>
       <p class="note">${S.ref?'AIアプリに<b>見本画像を添付してから</b>指示文を貼ってください。添付を忘れると絵柄がずれます。':'キャラの見本を作った会話の続きで送ると、絵柄がそろいやすくなります。'}</p>
       <div class="btns"><button class="btn dark" type="button" data-copy="${k}">① 指示文をコピー</button><a class="btn" target="_blank" rel="noopener" data-ai-link>AIを開く ↗</a><label class="btn primary">③ できた画像を読み込む<input type="file" accept="image/*" data-sheet="${k}"></label><button class="btn" type="button" data-adjust="${k}" ${p.n>1&&S.sheetSaved&&S.sheetSaved[k]===S.layout?'':'hidden'}>区切りを調整</button></div>
+      ${(S.touch&&S.touch[k]&&S.touch[k].length)?`<p class="warnline">${S.touch[k].map(pad).join('・')}番が、となりとくっついているかもしれません。下の「くっついている・ずれているときは」を見てください。</p>`:''}
+      <details class="help" ${(S.touch&&S.touch[k]&&S.touch[k].length)?'open':''}><summary>くっついている・ずれているときは</summary>
+        <ol class="flow small" style="margin-top:8px"><li>「区切りを調整」を押し、赤い線の丸を動かして切り分け直す</li><li>キャラ同士が重なっているときは、下のボタンの指示文をAIに送って作り直してもらう(見本画像も添付)</li><li>それでもだめな番号は、STEP 4の手直しで1個ずつ作り直す</li></ol>
+        <div class="btns" style="margin-top:8px"><button class="btn" type="button" data-copygap="${k}">すき間を広く空けて作り直す指示文をコピー</button></div>
+      </details>
       <details><summary>指示文を見る・書き換える${pEd()['sheet:'+k]?'(編集済み)':''}</summary><div class="pbox"></div></details>`;
     card.querySelector('.list').textContent=S.phrases.slice(from,to).map(x=>x.t||'(文字なし)').join('・');
     mountPrompt(card.querySelector('.pbox'),'sheet:'+k,()=>sheetPrompt(k));
@@ -1022,6 +1043,7 @@ function renderSheets(){
     for(let i=from;i<to;i++){const c=renderSt(i,W,H,M,true,true);c.className='checker';th.appendChild(c)}
     box.appendChild(card);
   }
+  box.querySelectorAll('[data-copygap]').forEach(b=>b.addEventListener('click',()=>{const k=Number(b.dataset.copygap);copyText(promptText('sheet:'+k,sheetPrompt(k))+'\n\n【作り直し】前の画像はキャラ同士が近すぎて、1体ずつ切り分けられませんでした。各キャラをマスの中央に今よりひと回り小さく描き、となりとのすき間をキャラの幅の半分以上空けてください。机・書類・カバンなどの物も、マスからはみ出さないようにしてください。')}));
   box.querySelectorAll('[data-adjust]').forEach(b=>b.addEventListener('click',()=>openCut(Number(b.dataset.adjust))));
   box.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const k=Number(b.dataset.copy);copyText(promptText('sheet:'+k,sheetPrompt(k)))}));
   box.querySelectorAll('[data-sheet]').forEach(inp=>inp.addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)await importSheet(f,Number(inp.dataset.sheet))}));
@@ -1030,8 +1052,8 @@ function renderSheets(){
 $('#copyChar').addEventListener('click',()=>copyText(promptText('char',charPrompt())));
 async function importSheet(f,k){
   busy(true,'切り分けと透明化をしています…');await tick();
-  try{const raw=await fileToCanvas(f,2400);const proc=removeBg(raw,60,false);const p=per();const from=k*p.n,to=Math.min(S.count,from+p.n);
-    const cells=p.n===1?[{raw,proc}]:splitSheet(proc,raw,p.cols,p.rows);let ok=0;
+  try{const raw=trimBars(await fileToCanvas(f,2400));const proc=removeBg(raw,60,false);const p=per();const from=k*p.n,to=Math.min(S.count,from+p.n);
+    const cells=p.n===1?[{raw,proc}]:splitSheet(proc,raw,p.cols,p.rows);let ok=0;S.touch=S.touch||{};S.touch[k]=p.n>1?touchList(cells,from,to):[];
     for(let j=0;j<cells.length&&from+j<to;j++){const t=cleanTrim(cells[j].proc);if(!t)continue;newSticker(from+j,cells[j].raw,t);ok++}
     if(p.n>1){try{await DB.set(`sheet:${S.id}:${k}`,{raw:raw.toDataURL('image/png')});S.sheetSaved[k]=S.layout}catch(e){}}
     save();renderSheets();renderRail();
@@ -1041,7 +1063,7 @@ async function importSheet(f,k){
 $('#ownFiles').addEventListener('change',async e=>{
   const files=[...e.target.files];e.target.value='';if(!files.length)return;busy(true,'画像を整えています…');await tick();let n=0,skip=0;
   try{for(const f of files){let i=-1;for(let k=0;k<S.count;k++)if(!S.stickers[k]){i=k;break}if(i<0){skip++;continue}
-    const raw=await fileToCanvas(f,1400);const t=cleanTrim(removeBg(raw,60,false));if(!t){skip++;continue}newSticker(i,raw,t);n++}
+    const raw=trimBars(await fileToCanvas(f,1400));const t=cleanTrim(removeBg(raw,60,false));if(!t){skip++;continue}newSticker(i,raw,t);n++}
     save();renderSheets();renderRail();toast(`${n}個を入れました${skip?`(${skip}個は入りませんでした)`:''}`);afterFill()}catch(err){toast(err.message)}finally{busy(false)}
 });
 
@@ -1069,7 +1091,7 @@ function closeCut(){$('#cutM').hidden=true;document.body.style.overflow='';CUT=n
 $('#cutClose').addEventListener('click',closeCut);
 $('#cutAuto').addEventListener('click',()=>{if(!CUT)return;CUT.cu=autoCuts(CUT.proc,CUT.p.cols,CUT.p.rows);drawCut()});
 $('#cutApply').addEventListener('click',async()=>{if(!CUT)return;busy(true,'切り分けています…');await tick();
-  try{const {proc,raw,cu,p,k}=CUT;const from=k*p.n,to=Math.min(S.count,from+p.n);const cells=cellsFrom(proc,raw,cu,p.cols,p.rows);let ok=0;
+  try{const {proc,raw,cu,p,k}=CUT;const from=k*p.n,to=Math.min(S.count,from+p.n);const cells=cellsFrom(proc,raw,cu,p.cols,p.rows);let ok=0;S.touch=S.touch||{};S.touch[k]=touchList(cells,from,to);
     for(let j=0;j<cells.length&&from+j<to;j++){const t=cleanTrim(cells[j].proc);if(!t)continue;newSticker(from+j,cells[j].raw,t);ok++}
     save();closeCut();renderSheets();renderRail();toast(`${ok}個を切り分け直しました`);afterFill()}finally{busy(false)}});
 
@@ -1122,7 +1144,7 @@ $('#edReset').addEventListener('click',async()=>{const st=S.stickers[EI];if(!st)
 $('#edCopy').addEventListener('click',()=>copyText(promptText('fix:'+EI,fixPrompt(EI))));
 $('#edNote').addEventListener('input',()=>{if(!pEd()['fix:'+EI])mountPrompt($('#edPromptBox'),'fix:'+EI,()=>fixPrompt(EI))});
 $('#edFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;busy(true,'画像を整えています…');await tick();
-  try{const raw=await fileToCanvas(f,1400);const t=cleanTrim(removeBg(raw,60,false));if(!t)toast('絵が見つかりませんでした');else{newSticker(EI,raw,t);save();syncEd();drawEd();toast('差し替えました')}}catch(err){toast(err.message)}finally{busy(false)}});
+  try{const raw=trimBars(await fileToCanvas(f,1400));const t=cleanTrim(removeBg(raw,60,false));if(!t)toast('絵が見つかりませんでした');else{newSticker(EI,raw,t);save();syncEd();drawEd();toast('差し替えました')}}catch(err){toast(err.message)}finally{busy(false)}});
 const CLEAR_BTN='<button class="btn danger" type="button" id="edClear">この枠を空にする</button>';
 $('#edClearArea').addEventListener('click',e=>{const a=$('#edClearArea'),id=e.target.id;
   if(id==='edClear')a.innerHTML=`<div class="confirm">この枠の画像を消します。<button class="btn danger" type="button" id="edClearYes">消す</button><button class="btn ghost" type="button" id="edClearNo">やめる</button></div>`;
