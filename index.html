@@ -591,7 +591,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
 <div class="busy" id="busy" hidden><div id="busyText">処理しています…</div></div>
 
 <script>
-const OPENCHAT_URL='';window.__OC=OPENCHAT_URL;
+const OPENCHAT_URL='https://line.me/ti/g2/ywDezi3KsC9QM2n-rvPhAXJ4zKNDtb0Jwma9lQ';window.__OC=OPENCHAT_URL;
 (()=>{
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 if(OPENCHAT_URL){$$('[data-oc]').forEach(a=>{a.href=OPENCHAT_URL;a.hidden=false});$$('[data-oc-wrap]').forEach(e=>e.hidden=false)}
@@ -1486,7 +1486,7 @@ renderSetup();go(1);boot();
   const g=document.getElementById('gate');g.hidden=false;document.body.style.overflow='hidden';
   const oc=window.__OC||'';if(oc){document.getElementById('gateOc').href=oc;document.getElementById('gateOcWrap').hidden=false}
   const now=Date.now(),msg=document.getElementById('gateMsg');
-  if(now<OPEN){msg.textContent='このツールは、10/26(月)21:00〜23:59 の間だけ配布します。\n合言葉は、21:00にLINEオープンチャットで発表します。\n少しだけ待っていてください。'}
+  if(now<OPEN){msg.textContent='このツールは、10/26(月)21:00〜23:59 の間だけ配布します。\n合言葉は、21:00にLINEオープンチャット「AIスタンプ作り部」で発表します。\n(オープンチャットの参加コードは、InstagramのDMでお送りしています)\n少しだけ待っていてください。'}
   else if(now>=CLOSE){msg.textContent='今回の配布は終了しました。\nたくさんのご参加、ありがとうございました!\n次回のお知らせや感想の受付は、LINEオープンチャットで行っています。'}
   else{msg.textContent='フォロワー限定のプレゼントです。\nオープンチャットで発表された合言葉を入れてください。';document.getElementById('gateForm').hidden=false}
   const norm=s=>[...s.normalize('NFKC').trim().toLowerCase()].map(c=>c>='ァ'&&c<='ヶ'?String.fromCharCode(c.charCodeAt(0)-0x60):c).join('');
