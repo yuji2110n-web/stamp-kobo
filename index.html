@@ -256,9 +256,11 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
     <div class="brand-mark" aria-hidden="true">ス</div>
     <div style="min-width:0"><h1>スタンプ工房</h1><small id="hdrSub">セット:—</small></div>
   </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><a class="btn ghost" data-oc target="_blank" rel="noopener" hidden style="min-height:44px">感想を送る</a>
   <div class="views" role="group" aria-label="表示の切り替え">
     <button type="button" id="viewMake" aria-pressed="true">作る</button>
     <button type="button" id="viewGuide" aria-pressed="false">使い方</button>
+  </div>
   </div>
 </header>
 
@@ -443,6 +445,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
   <div class="card">
     <div class="row"><h3>申請用ZIP</h3><span class="pill" id="zipState"></span></div>
     <p class="small muted">中身:01.png〜<span id="zipLast">40</span>.png(370×320・背景透明・余白10px)、main.png、tab.png</p>
+    <p class="note" data-oc-wrap hidden>使ってみた感想(よかったところ・直してほしいところ)を、LINEオープンチャットで聞かせてください。<br><a class="btn dark" data-oc target="_blank" rel="noopener" style="margin-top:8px">感想を送る(LINEオープンチャット) ↗</a></p>
     <div class="btns"><button class="btn primary" type="button" id="zipBtn">ZIPを保存</button><button class="btn" type="button" id="sheetBtn">宣伝用の一覧画像を保存</button></div>
   </div>
   <div class="card">
@@ -523,6 +526,7 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
       <details><summary>データが消えた・別の端末で続けたい</summary><p>STEP 1の「バックアップを保存」でファイルにしておき、別の端末で「バックアップから読み込む」を使ってください。</p></details>
     </div>
   </article>
+  <article data-oc-wrap hidden><h3>感想・要望を聞かせてください</h3><p class="small muted">よかったところ、直してほしいところ、ほしい機能などを、LINEオープンチャットで受け付けています。</p><div class="btns"><a class="btn dark" data-oc target="_blank" rel="noopener">LINEオープンチャットを開く ↗</a></div></article>
   <div class="next"><button class="btn primary big" type="button" id="guideBack">作る画面に戻る</button></div>
 </section>
 </div>
@@ -587,8 +591,10 @@ ol.flow{margin:0;padding-left:1.4em;display:grid;gap:6px}
 <div class="busy" id="busy" hidden><div id="busyText">処理しています…</div></div>
 
 <script>
+const OPENCHAT_URL='';window.__OC=OPENCHAT_URL;
 (()=>{
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+if(OPENCHAT_URL){$$('[data-oc]').forEach(a=>{a.href=OPENCHAT_URL;a.hidden=false});$$('[data-oc-wrap]').forEach(e=>e.hidden=false)}
 const W=370,H=320,M=10;
 
 const PROVIDERS={
@@ -1387,7 +1393,7 @@ $('#zipBtn').addEventListener('click',async()=>{
   try{await ensureFonts();const files=[];for(let i=0;i<S.count;i++)files.push({name:pad(i+1)+'.png',data:await toBytes(renderSt(i))});
     files.push({name:'main.png',data:await toBytes(renderSt(S.mainIdx,240,240,8,false))});files.push({name:'tab.png',data:await toBytes(renderSt(S.tabIdx,96,74,2,false))});blob=makeZip(files)}
   catch(err){toast('ZIPを作れませんでした')}finally{busy(false)}
-  if(blob)await saveFile(`line_stamp_${S.count}.zip`,blob);
+  if(blob){await saveFile(`line_stamp_${S.count}.zip`,blob);if(OPENCHAT_URL)setTimeout(()=>toast('おつかれさまでした!よければオープンチャットで感想を聞かせてください',5000),5200)}
 });
 $('#sheetBtn').addEventListener('click',async()=>{
   const cols=Math.min(8,S.count),rows=Math.ceil(S.count/cols),tw=185,th=160;const c=mk(cols*tw,rows*th),x=ctx(c);
@@ -1450,6 +1456,46 @@ async function boot(){
   go(S.step||1);
 }
 renderSetup();go(1);boot();
+})();
+</script>
+
+<div id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">ス</div><div><h1>スタンプ工房</h1><small>フォロワー限定プレゼント</small></div></div>
+    <p id="gateMsg" class="gate-msg"></p>
+    <div id="gateForm" class="gate-form" hidden>
+      <label class="f">合言葉<input type="text" id="gateInput" autocomplete="off" placeholder="オープンチャットで発表された合言葉"></label>
+      <button class="btn primary big" type="button" id="gateBtn">はじめる</button>
+      <p class="warnline" id="gateErr" hidden></p>
+    </div>
+    <div class="btns" id="gateOcWrap" hidden><a class="btn dark" id="gateOc" target="_blank" rel="noopener">LINEオープンチャットを開く ↗</a></div>
+  </div>
+</div>
+<style>
+.gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
+.gate-card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;display:grid;gap:18px}
+.gate-msg{font-size:17px;line-height:1.8;white-space:pre-line}
+.gate-form{display:grid;gap:12px}
+</style>
+<script>
+(()=>{
+  const H='2405635c15a40bd3294b3fddede5f9d608e52a3df3cde5444b763eb6ccca657f';
+  const OPEN=Date.UTC(2026,9,26,12,0,0),CLOSE=Date.UTC(2026,9,26,15,0,0),KEY='stampkobo-unlock';
+  let ok=false;try{ok=localStorage.getItem(KEY)===H}catch(e){}
+  if(ok)return;
+  const g=document.getElementById('gate');g.hidden=false;document.body.style.overflow='hidden';
+  const oc=window.__OC||'';if(oc){document.getElementById('gateOc').href=oc;document.getElementById('gateOcWrap').hidden=false}
+  const now=Date.now(),msg=document.getElementById('gateMsg');
+  if(now<OPEN){msg.textContent='このツールは、10/26(月)21:00〜23:59 の間だけ配布します。\n合言葉は、21:00にLINEオープンチャットで発表します。\n少しだけ待っていてください。'}
+  else if(now>=CLOSE){msg.textContent='今回の配布は終了しました。\nたくさんのご参加、ありがとうございました!\n次回のお知らせや感想の受付は、LINEオープンチャットで行っています。'}
+  else{msg.textContent='フォロワー限定のプレゼントです。\nオープンチャットで発表された合言葉を入れてください。';document.getElementById('gateForm').hidden=false}
+  const norm=s=>[...s.normalize('NFKC').trim().toLowerCase()].map(c=>c>='ァ'&&c<='ヶ'?String.fromCharCode(c.charCodeAt(0)-0x60):c).join('');
+  const hex=async s=>{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')};
+  const tryIt=async()=>{const err=document.getElementById('gateErr');if(Date.now()>=CLOSE){location.reload();return}
+    let h='';try{h=await hex(norm(document.getElementById('gateInput').value))}catch(e){}
+    if(h===H){try{localStorage.setItem(KEY,H)}catch(e){}g.remove();document.body.style.overflow=''}else{err.hidden=false;err.textContent='合言葉がちがいます。もう一度確かめてください。'}};
+  document.getElementById('gateBtn').addEventListener('click',tryIt);
+  document.getElementById('gateInput').addEventListener('keydown',e=>{if(e.key==='Enter')tryIt()});
 })();
 </script>
 
