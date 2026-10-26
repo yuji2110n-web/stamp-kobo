@@ -1465,7 +1465,6 @@ async function boot(){
 renderSetup();go(1);boot();
 })();
 </script>
-
 <div id="gate" class="gate" hidden>
   <div class="gate-card">
     <div class="brand"><div class="brand-mark" aria-hidden="true">ス</div><div><h1>スタンプ工房</h1><small>フォロワー限定プレゼント</small></div></div>
@@ -1494,17 +1493,15 @@ renderSetup();go(1);boot();
   const oc=window.__OC||'';if(oc){document.getElementById('gateOc').href=oc;document.getElementById('gateOcWrap').hidden=false}
   const now=Date.now(),msg=document.getElementById('gateMsg');
   if(now<OPEN){msg.textContent='このツールは、10/26(月)21:00〜23:59 の間だけ配布します。\n合言葉は、21:00にLINEオープンチャット「AIスタンプ作り部」で発表します。\n(オープンチャットの参加コードは、InstagramのDMでお送りしています)\n少しだけ待っていてください。'}
-  else if(now>=CLOSE){msg.textContent='今回の配布は終了しました。\nたくさんのご参加、ありがとうございました!\n次回のお知らせや感想の受付は、LINEオープンチャットで行っています。'}
+  else if(now>=CLOSE){msg.textContent='今回の配布は終了しました。\nすでに受け取った方は、オープンチャットで発表した合言葉を入れると使えます。\n次回のお知らせや感想の受付は、LINEオープンチャットで行っています。';document.getElementById('gateForm').hidden=false}
   else{msg.textContent='フォロワー限定のプレゼントです。\nオープンチャットで発表された合言葉を入れてください。';document.getElementById('gateForm').hidden=false}
   const norm=s=>[...s.normalize('NFKC').trim().toLowerCase()].map(c=>c>='ァ'&&c<='ヶ'?String.fromCharCode(c.charCodeAt(0)-0x60):c).join('');
   const hex=async s=>{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')};
-  const tryIt=async()=>{const err=document.getElementById('gateErr');if(Date.now()>=CLOSE){location.reload();return}
+  const tryIt=async()=>{const err=document.getElementById('gateErr');
     let h='';try{h=await hex(norm(document.getElementById('gateInput').value))}catch(e){}
     if(h===H){try{localStorage.setItem(KEY,H)}catch(e){}g.remove();document.body.style.overflow=''}else{err.hidden=false;err.textContent='合言葉がちがいます。もう一度確かめてください。'}};
   document.getElementById('gateBtn').addEventListener('click',tryIt);
   document.getElementById('gateInput').addEventListener('keydown',e=>{if(e.key==='Enter')tryIt()});
 })();
 </script>
-
-</body>
-</html>
+</body></html>
